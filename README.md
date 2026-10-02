@@ -23,9 +23,9 @@ Inside the server, **explanation callouts** are anchored to the stations (X-ray 
 
 Open `index.html` directly, or serve the folder with `python3 -m http.server`. There is no build step. Three.js 0.180 loads from jsDelivr; without it (or without WebGL) the demo switches to a schematic view and keeps working.
 
-**Keys:** `→`/`N`/`Space` next (the first press finishes the current animation), `←` back, `1–4` pick a prompt, `Enter` send, `A` autoplay (kiosk loop; any touch takes over), `R` restart, `H` help, `F` fullscreen. In the 3D view: drag to rotate, scroll to zoom, double-click to reset.
+**Keys:** `→`/`N`/`Space` next (the first press finishes the current animation), `←` back, `1–4` pick a prompt, `Enter` send, `A` switches Auto ↔ Krok po kroku (the app **starts in Auto**, a kiosk-style loop; pressing a button or a navigation key switches to step by step, rotating the 3D view does not), `R` restart, `H` help, `F` fullscreen. In the 3D view: drag to rotate, scroll to zoom, double-click to reset.
 
-**URL parameters:** `?auto=1` · `?scene=<id>&prompt=sensitive|routine|complex&policy=apiq|frontier|off` · `?speed=0.5–4` · `?selftest=1`.
+**URL parameters:** `?auto=0` (start step by step) · `?auto=1` · `?scene=<id>&prompt=sensitive|routine|complex&policy=apiq|frontier|off` · `?speed=0.5–4` · `?selftest=1`.
 
 ## Files
 

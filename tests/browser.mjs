@@ -29,6 +29,20 @@ try {
   // 1) WebGL self-test
   const page = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
   await page.goto(BASE); await ready(page);
+  // default mode: Auto, advancing without input; dragging the 3D view keeps it; the switch goes to step by step
+  check("starts in Auto mode", (await data(page)).auto === "true");
+  await page.waitForFunction(() => document.getElementById("app").dataset.scene !== "login", null, { timeout: 45000 });
+  check("Auto advances past the first scene on its own", true);
+  const box = await page.locator(".world-canvas").boundingBox();
+  if (box) { await page.mouse.move(box.x + 200, box.y + 200); await page.mouse.down(); await page.mouse.move(box.x + 320, box.y + 210); await page.mouse.up(); }
+  check("rotating the 3D view keeps Auto", (await data(page)).auto === "true");
+  await page.click("#btnStep");
+  check("switch to Krok po kroku", (await data(page)).auto === "false" && await page.getAttribute("#btnStep", "aria-pressed") === "true");
+  await page.click("#btnAuto");
+  check("switch back to Auto", (await data(page)).auto === "true");
+  const stepPage = watch(await browser.newPage({ viewport: { width: 1280, height: 800 } }));
+  await stepPage.goto(BASE + "?auto=0"); await ready(stepPage);
+  check("?auto=0 starts step by step", (await data(stepPage)).auto === "false"); await stepPage.close();
   const st = await page.evaluate(() => App.selfTest());
   check("self-test: prompts × policies × scenes", st.ok, st.failures.slice(0, 3).join(" | "));
   const col = await page.evaluate(() => KlaraWorld.debugCollisions());

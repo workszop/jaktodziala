@@ -72,6 +72,11 @@ button{font:inherit;color:inherit}
 .hbtn kbd{font-family:var(--font-mono);font-size:10px;color:var(--chrome-muted)}
 .hbtn[aria-pressed="true"]{background:var(--klara);border-color:var(--klara)}
 .hbtn[aria-pressed="true"] kbd{color:var(--chrome-ink)}
+.modesw{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--chrome-line);border-radius:var(--radius-pill)}
+.modesw button{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:none;border-radius:var(--radius-pill);background:transparent;color:var(--chrome-muted);font-size:var(--fs-sm);font-weight:700;cursor:pointer;transition:var(--transition);white-space:nowrap}
+.modesw button:hover{color:var(--chrome-ink);background:var(--chrome-2)}
+.modesw button[aria-pressed="true"]{background:var(--klara);color:var(--chrome-ink)}
+.modesw kbd{font-family:var(--font-mono);font-size:10px;color:var(--chrome-muted);padding:0 8px 0 4px}
 
 .steps{display:flex;gap:4px;padding:8px 18px;background:var(--surface-raised);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .steps ol{display:flex;gap:4px;list-style:none;flex:1}
@@ -332,6 +337,7 @@ dialog h3{font-size:var(--fs-xl);margin-bottom:12px}
   .main{grid-template-columns:minmax(0,1fr);grid-template-rows:58vh auto}
   .top{padding:8px 10px;gap:8px}.brand{gap:8px}.brand img{height:24px}.brand h1{font-size:var(--fs-md)}
   .hbtn{padding:7px 9px}.hbtn kbd{display:none}
+  .modesw button{padding:5px 9px}.modesw kbd,.modesw .txt{display:none}
   .panel h2{font-size:var(--fs-xl)}
   .panel{border-left:none;border-top:1px solid var(--line)}
   .monitor{inset:2% 2% 4%;padding:8px 8px 16px;border-radius:12px}
@@ -355,7 +361,11 @@ dialog h3{font-size:var(--fs-xl);margin-bottom:12px}
       <span class="label">bezpieczny (i inteligentny) chat AI · interaktywna podróż zapytania</span>
     </div>
     <div class="tools">
-      <button class="hbtn" id="btnAuto" type="button" aria-pressed="false" title="Autoodtwarzanie (A)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5v15l13-7.5z"/></svg><span class="txt">Auto</span> <kbd>A</kbd></button>
+      <div class="modesw" id="modeSwitch" role="group" aria-label="Tryb odtwarzania (A przełącza)" title="Tryb odtwarzania (A)">
+        <button id="btnAuto" type="button" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5v15l13-7.5z"/></svg><span class="txt">Auto</span></button>
+        <button id="btnStep" type="button" aria-pressed="false"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14l9-7z"/><path d="M18 5v14"/></svg><span class="txt">Krok po kroku</span></button>
+        <kbd>A</kbd>
+      </div>
       <button class="hbtn" id="btnRestart" type="button" title="Od nowa (R)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="txt">Od nowa</span> <kbd>R</kbd></button>
       <button class="hbtn" id="btnHelp" type="button" title="Pomoc (H)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><path d="M12 17h.01"/></svg><span class="txt">Pomoc</span> <kbd>H</kbd></button>
     </div>
@@ -410,7 +420,7 @@ dialog h3{font-size:var(--fs-xl);margin-bottom:12px}
       <kbd>←</kbd><span>wstecz</span>
       <kbd>1 2 3 4</kbd><span>wybór polecenia w oknie czatu (4 – z załącznikiem)</span>
       <kbd>Enter</kbd><span>wyślij polecenie do Klary</span>
-      <kbd>A</kbd><span>autoodtwarzanie (pętla kioskowa; dotknięcie przejmuje sterowanie)</span>
+      <kbd>A</kbd><span>przełącz tryb: Auto (domyślny, pętla kioskowa) ↔ Krok po kroku; kliknięcie przycisku lub klawisz nawigacji przełącza na Krok po kroku</span>
       <kbd>R</kbd><span>od nowa</span>
       <kbd>F</kbd><span>pełny ekran</span>
       <kbd>Esc</kbd><span>zamknij okno</span>

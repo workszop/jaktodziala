@@ -51,7 +51,7 @@
   const finalEl = $("final"), statusEl = $("status"), flowEl = $("flow"), flowBig = $("flowBig");
   const pNum = $("pNum"), pShort = $("pShort"), pTitle = $("pTitle"), pProg = $("pProg"), pLead = $("pLead"), pBullets = $("pBullets"), pActions = $("pActions");
   const inspector = $("inspector"), iText = $("iText"), iAtt = $("iAtt"), iChecks = $("iChecks"), iRoutes = $("iRoutes"), iMeta = $("iMeta");
-  const btnBack = $("btnBack"), btnNext = $("btnNext"), nextLabel = $("nextLabel"), btnAuto = $("btnAuto"), btnRestart = $("btnRestart");
+  const btnBack = $("btnBack"), btnNext = $("btnNext"), nextLabel = $("nextLabel"), btnAuto = $("btnAuto"), btnStep = $("btnStep"), modeSwitch = $("modeSwitch"), btnRestart = $("btnRestart");
   const help = $("help"), btnHelp = $("btnHelp"), btnHelpClose = $("btnHelpClose"), btnProbe = $("btnProbe"), probeOut = $("probeOut");
 
   // ─── Helpers ───
@@ -454,7 +454,11 @@
     Object.assign(state, { promptId: null, policy: { ...K.DEFAULT_POLICY }, runPolicy: null, fresh: false, runs: [], recorded: -1, reached: 0, monitorKey: "", announced: "" });
     if (W.resetView) W.resetView(); goTo(0);
   }
-  function setAuto(on) { state.auto = on; state.dwell = 0; btnAuto.setAttribute("aria-pressed", String(on)); renderContract(); }
+  function setAuto(on) {
+    state.auto = on; state.dwell = 0;
+    btnAuto.setAttribute("aria-pressed", String(on)); btnStep.setAttribute("aria-pressed", String(!on));
+    renderContract();
+  }
   function autoTick(dt) {
     if (!state.auto || state.playing || help.open) return;
     state.dwell += dt;
@@ -520,17 +524,20 @@
   // ─── Listeners ───
   function bindListeners() {
     btnNext.addEventListener("click", next); btnBack.addEventListener("click", back);
-    btnAuto.addEventListener("click", () => setAuto(!state.auto));
+    btnAuto.addEventListener("click", () => setAuto(true)); btnStep.addEventListener("click", () => setAuto(false));
     btnRestart.addEventListener("click", restart);
     btnHelp.addEventListener("click", () => help.showModal()); btnHelpClose.addEventListener("click", () => help.close());
     btnProbe.addEventListener("click", () => { const r = probe(); probeOut.textContent = (r.ok ? "OK – kontrakt DOM i inwarianty prywatności spełnione." : "BŁĘDY: " + r.failures.join(", ")) + "\n" + JSON.stringify({ scene: r.scene, prompt: r.prompt, route: r.route, packet: r.packet, renderer: r.world.renderer, worldPacket: r.world.packetNode }, null, 1); });
-    // touch / click takes over from autoplay (kiosk behaviour)
-    document.addEventListener("pointerdown", e => { if (state.auto && !btnAuto.contains(e.target)) setAuto(false); }, true);
+    // pressing a control takes over from autoplay (kiosk behaviour); rotating the 3D view does not
+    document.addEventListener("pointerdown", e => {
+      if (!state.auto || modeSwitch.contains(e.target) || !(e.target instanceof Element) || !e.target.closest("button, a, [role=radio]")) return;
+      setAuto(false);
+    }, true);
     document.addEventListener("keydown", e => {
       if (help.open || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key, onButton = e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement;
       if ((k === " " || k === "Enter") && onButton) return;
-      if (k.toLowerCase() !== "a" && state.auto) setAuto(false);
+      if (state.auto && ["arrowright", "arrowleft", "pagedown", "pageup", " ", "n", "enter", "1", "2", "3", "4", "r"].includes(k.toLowerCase())) setAuto(false);
       const group = e.target.closest && e.target.closest('[role="radiogroup"]');
       if (group && ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(k)) {
         e.preventDefault();
@@ -577,7 +584,8 @@
     const sc = PARAMS.get("scene");
     if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) { state.reached = IDX[sc]; goTo(IDX[sc], { play: PARAMS.get("play") === "1" }); }
     else goTo(0);
-    if (PARAMS.get("auto") === "1") setAuto(true);
+    // Auto is the default; deep links to a scene (presenters, tests) and ?auto=0 start step by step.
+    setAuto(PARAMS.get("auto") === "1" || (PARAMS.get("auto") !== "0" && !sc && PARAMS.get("selftest") !== "1"));
     window.App = { state, probe, selfTest, goTo: id => goTo(IDX[id] ?? id, { play: false }), startRun, setPolicy, next, back, restart, snapshot, world: () => W.info() };
     requestAnimationFrame(loop);
     if (PARAMS.get("selftest") === "1") {
