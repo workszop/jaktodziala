@@ -334,3 +334,16 @@ dialog h3{font-size:var(--fs-xl);margin-bottom:12px}
   .routes{grid-template-columns:1fr}
   .stage-hint{display:none}
 }
+
+/* ─── Document rows (inspector) and citation cards (chat) ─── */
+.docs{display:flex;flex-direction:column;gap:5px}
+.doc{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:6px 9px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-raised);font-size:var(--fs-sm)}
+.doc small{grid-column:2;color:var(--ink-soft);font-size:var(--fs-xs)}
+.doc svg{color:var(--ink-mute)}
+.doc[data-state="cited"]{border-color:var(--ok);background:var(--ok-tint)}.doc[data-state="cited"] svg{color:var(--ok)}
+.doc[data-state="skipped"]{border-color:var(--danger);background:var(--danger-tint)}.doc[data-state="skipped"] svg{color:var(--danger)}.doc[data-state="skipped"] b{text-decoration:line-through}
+.doc[data-state="dropped"]{opacity:.55}
+.cites{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+.cite{display:flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--surface-raised);font-size:var(--fs-sm)}
+.cite small{margin-left:auto;color:var(--ink-soft);font-size:var(--fs-xs)}.cite svg{color:var(--accent);flex:none}
+.bubble .meta.warn{color:var(--warn)}

@@ -227,6 +227,7 @@ window.AppCore = (() => {
         button("btn btn-ghost", B.adminAction, () => goTo(IDX.admin)),
         button("btn btn-ghost", "Zacznij od nowa", () => restart()));
       const link = el("a", "btn btn-ghost", B.name + " na quanticalab.ai"); link.href = K.SOURCE_URL; link.target = "_blank"; link.rel = "noopener"; acts.appendChild(link);
+      if (B.sibling) { const sib = el("a", "btn btn-ghost", B.sibling.label); sib.href = B.sibling.href; acts.appendChild(sib); }
       card.append(h, left, ben, acts); finalEl.appendChild(card);
     }
 

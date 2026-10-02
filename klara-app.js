@@ -241,7 +241,7 @@
       hello: "Dzień dobry! W czym mogę pomóc? Model dopasuję do zadania automatycznie.", history: ["Plan szkoleń na IV kwartał", "Podsumowanie spotkania działu"],
       chipsLabel: "Przykładowe polecenia", placeholder: "Wybierz przykładowe polecenie powyżej…", placeholderNext: "Wybierz kolejne polecenie powyżej…",
       finalTitle: "Klara od środka – podsumowanie", finalSub: "Jedno okno czatu dla pracownika. Pełna kontrola nad danymi, modelami i kosztami po stronie organizacji.",
-      tryAnother: "Wypróbuj inne polecenie", adminAction: "Zmień politykę organizacji"
+      tryAnother: "Wypróbuj inne polecenie", adminAction: "Zmień politykę organizacji", sibling: { label: "Zobacz też: Zagłoba od środka", href: "zagloba.html" }
     },
     autoOrder: ["sensitive", "routine", "complex", "attachment"],
     dwell: { scan: 4.5, route: 4.5 },

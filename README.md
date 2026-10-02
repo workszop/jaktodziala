@@ -1,4 +1,8 @@
-# Klara od środka
+# Klara od środka · Zagłoba od środka
+
+Two interactive 3D walkthroughs built on one shared engine: **Klara** (`index.html`) and **Zagłoba** (`zagloba.html`).
+
+## Klara od środka
 
 An interactive 3D walkthrough of **Klara – bezpieczny (i inteligentny) chat AI**, seen from the user's side and then from inside the server. Visually it matches the *Explore the Floor* sales demo (`../oferta`): the same isometric voxel world, the same robot and the same Quantica Lab tokens.
 
@@ -27,17 +31,39 @@ Open `index.html` directly, or serve the folder with `python3 -m http.server`. T
 
 **URL parameters:** `?auto=0` (start step by step) · `?auto=1` · `?scene=<id>&prompt=sensitive|routine|complex&policy=apiq|frontier|off` · `?speed=0.5–4` · `?selftest=1`.
 
+## Zagłoba od środka (`zagloba.html`)
+
+The journey of a question through **Zagłoba – inteligentny asystent wiedzy** (RAG). Same office, robot, desktop and Quantica AI Server, different stations inside:
+
+| # | Scene | What happens |
+|---|---|---|
+| 01 | Pulpit i logowanie | Login with an organisation account – the user's role and access rights come with it. |
+| 02 | Pytanie | 4 questions: procedure · restricted access · no coverage · a document changed yesterday. |
+| 03 | Wysyłka | The question rides the cable to the server; Zagłoba can run fully on-premise. |
+| 04 | Wyszukiwanie | Hybrid search over the knowledge index (shelves synced with SharePoint, OneDrive, Amazon S3): keyword highlights on the sheet, beams to the candidate documents. For question 4 the changed document first arrives through the SharePoint sync pipe. |
+| 05 | Uprawnienia | A badge gate checks every candidate; a document from the board folder is stopped, locked and dropped into the "skipped" tray. |
+| 06 | Trafność | Re-ranking: the most relevant documents climb a podium (top 3), weak ones fade. |
+| 07 | Model | The local model (GPU server cabinet) answers only from the selected fragments – or abstains when the base has no coverage and names the right source. |
+| 08 | Odpowiedź | The answer in the chat with citation cards [1] [2] … |
+| 09 | Panel | Data sources with background sync, and the user's access to the board folder – grant it and ask question 2 again. |
+| 10 | Podsumowanie | Runs and the five benefits from the product page. |
+
+Invariant: a document the user cannot read is never cited (`tests/zagloba.cjs` + `App.probe`).
+
 ## Files
 
+- `world-core.js` – the shared 3D engine (office, robots, server shell, cable, sheet, clouds, GPU cabinet, labels, callouts, camera, collision probe).
+- `app-core.js` + `app.css` – the shared app shell (state machine, stepper, panel, desktop and chat, Auto / Krok po kroku, DOM contract, probe, self-test).
+- `klara-stations.js`, `klara-app.js` / `zagloba-stations.js`, `zagloba-app.js` – each product's stations and content.
+- `zagloba-data.js` – sources, documents, questions and the pure `decide(question, settings)` (permissions, re-ranking, abstention).
 - `klara-data.js` – scenes, prompts (incl. an attachment), routes, `protectedItems()` and the pure `decide(prompt, policy)`. Invariant: protected data, in the prompt or an attachment, is never routed externally.
-- `klara-world.js` – the Three.js diorama. World state is a pure function of `{sceneId, t, prompt, decision}`, so back-navigation and skipping are deterministic.
-- `klara-app.js` – the scene state machine, narration panel, in-world screens, admin panel and autoplay.
 - `index.html` – the shell and all CSS tokens (`--world-*` drive the 3D colours).
 
 ## Verify
 
 ```sh
 node tests/route.cjs
+node tests/zagloba.cjs
 PLAYWRIGHT_MODULE=/abs/path/playwright/index.mjs CHROME_PATH=/usr/bin/google-chrome node tests/browser.mjs
 ```
 

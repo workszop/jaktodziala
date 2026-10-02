@@ -1,4 +1,4 @@
-// Headless browser checks: WebGL self-test over every prompt × policy × scene, a real-time
+// Headless browser checks for both apps (Klara: index.html, Zagłoba: zagloba.html): WebGL self-test over every prompt × policy × scene, a real-time
 // keyboard playthrough, phone-width overflow and the CDN-blocked schematic fallback.
 // Run: PLAYWRIGHT_MODULE=/abs/path/to/playwright/index.mjs CHROME_PATH=/usr/bin/google-chrome node tests/browser.mjs
 import { createServer } from "node:http";
@@ -75,6 +75,29 @@ try {
   const fp = await f.evaluate(() => App.probe());
   check("fallback probe (privacy + flow contract)", fp.ok, fp.failures.join(","));
   check("fallback blocks external routes", await f.evaluate(() => ["apiq", "frontier"].every(r => document.querySelector(`#flowBig [data-node="${r}"]`).dataset.state === "blocked")));
+
+  // 5) Zagłoba: same shell and engine, its own invariants (permissions, citations, abstention)
+  const z = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
+  await z.goto(BASE.replace("index.html", "zagloba.html") + "?auto=0"); await ready(z);
+  const zt = await z.evaluate(() => App.selfTest());
+  check("Zagłoba self-test: questions × access × scenes", zt.ok, zt.failures.slice(0, 3).join(" | "));
+  const zc = await z.evaluate(() => ZaglobaWorld.debugCollisions());
+  check("Zagłoba: sheet never passes through scene geometry", zc.ok, (zc.hits || []).slice(0, 3).map(h => h.scene + "@" + h.t0 + " " + h.mesh).join(" | "));
+  await z.evaluate(() => App.restart()); await z.keyboard.press("ArrowRight"); await z.waitForTimeout(100);
+  await z.waitForFunction(() => document.getElementById("app").dataset.phase === "done", null, { timeout: 45000 });
+  const zseen = [];
+  for (let i = 0; i < 14; i++) {
+    const d = await data(z); zseen.push(d.scene); if (d.scene === "final") break;
+    if (d.scene === "chat") { await z.keyboard.press("2"); await z.keyboard.press("Enter"); } else await z.keyboard.press("ArrowRight");
+    await z.waitForFunction(() => document.getElementById("app").dataset.phase === "done", null, { timeout: 45000 });
+    const pr = await z.evaluate(() => App.probe()); if (!pr.ok) check("Zagłoba probe at " + pr.scene, false, pr.failures.join(","));
+  }
+  check("Zagłoba playthrough (restricted question) reaches the summary", zseen.at(-1) === "final", zseen.join(">"));
+  const zrun = await z.evaluate(() => App.state.runs[0]);
+  check("Zagłoba: board document skipped and never cited", zrun && zrun.skipped.includes("budzet") && !zrun.citations.includes("budzet"));
+  const zm = watch(await browser.newPage({ viewport: { width: 390, height: 844 } }));
+  await zm.goto(BASE.replace("index.html", "zagloba.html") + "?scene=admin&prompt=restricted"); await ready(zm);
+  check("Zagłoba: no horizontal overflow at 390px", await zm.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
   const real = errors.filter(e => !/jsdelivr|ERR_FAILED|Failed to fetch dynamically/.test(e)); // the blocked CDN in step 4 is expected
   check("no console errors", real.length === 0, real.slice(0, 3).join(" | "));

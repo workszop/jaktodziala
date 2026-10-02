@@ -568,7 +568,8 @@ window.WorldCore = (() => {
     function frame(s, dt) {
       if (info.renderer !== "webgl" || !s) return;
       info.frames++;
-      const sig = [s.sceneId, s.t.toFixed(4), S.sig ? S.sig(s) : "", s.prompt ? s.prompt.id : "", s.calloutsSig || "", width, height, user.yaw, user.zoom].join("|");
+      // the end state (t = 1) must always get its own frame: rounding alone would merge it with t = 0.99996
+      const sig = [s.sceneId, s.t >= 1 ? "end" : s.t.toFixed(5), S.sig ? S.sig(s) : "", s.prompt ? s.prompt.id : "", s.calloutsSig || "", width, height, user.yaw, user.zoom].join("|");
       const animating = S.animating ? S.animating(s) : false;
       if (sig === lastSig && settled && !animating) return;
       lastSig = sig;
