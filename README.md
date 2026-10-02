@@ -9,15 +9,15 @@ An interactive 3D walkthrough of **Klara – bezpieczny (i inteligentny) chat AI
 | 01 | Pulpit i logowanie | The robot walks to its desk. The monitor shows its desktop; the Klara icon opens a window and the robot logs in with an organisation account. |
 | 02 | Okno czatu | The Klara chat inside the desktop window. Pick one of 4 prompts: protected data / routine / complex / **attachment with company data**. |
 | 03 | Wysyłka | The prompt becomes a glowing packet that rides the cable to the **Quantica AI Server**. |
-| 04 | Skaner | The rack opens. Attachment pages slide out over the **attachment reader**, confidential lines flash red and get masked; the scanner masks protected data in the prompt. |
+| 04 | Skaner | The rack opens. The sheet passes through an **X-ray tunnel**; a preview monitor above the rack shows the message and the **attachment pages** side by side – protected fragments flash red, then turn into black redaction bars with tokens. |
 | 05 | Złożoność | A gauge rates task complexity. |
 | 06 | Zwrotnica i reguły | A **rules board** evaluates 3 rules one by one (protected data → complexity → policy) with lamps; barriers + padlocks close external exits; the chosen track lights green, blocked ones red. |
-| 07 | Model | Local GPU module, or out through *Wyjście z organizacji* to the Quantica APIQ / Frontier API cloud. |
+| 07 | Model | Local route: a **cabinet of GPU servers** (one local model each) – the chosen server slides out and takes the sheet in. External: out through *Wyjście z organizacji* to the Quantica APIQ / Frontier API cloud. |
 | 08 | Odpowiedź | The answer travels back to the chat, labelled with the model that handled it. |
 | 09 | Panel organizacji | Admin dashboard: usage per route, the fixed data-protection rule, a policy for complex tasks (APIQ / Frontier / local only) and a re-run button. |
 | 10 | Podsumowanie | Your runs and the four benefits, plus a link to the product page. |
 
-Inside the server, **explanation callouts** are anchored to the stations (reader, scanner, gauge, switch, local model, exit gate, clouds) and fill in step by step, so the explanation lives in the 3D scene, not only in the side panel. Prompt 4 shows that Klara reads attachments: the prompt text is harmless and complex (it would go external), but the attachment's confidential content keeps it local.
+Inside the server, **explanation callouts** are anchored to the stations (X-ray monitor, scanner, gauge, switch, local model, exit gate, clouds) and fill in step by step, so the explanation lives in the 3D scene, not only in the side panel. Prompt 4 shows that Klara reads attachments: the prompt text is harmless and complex (it would go external), but the attachment's confidential content keeps it local.
 
 ## Run
 

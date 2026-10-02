@@ -11,40 +11,42 @@ window.KlaraWorld = (() => {
   const COLOR_KEYS = ["paper", "cream", "ink", "wood", "metal", "upholstery", "pot", "soil", "leaf", "leafLight", "screen", "wall", "wallServer",
     "glass", "foundation", "edge", "officeFloor", "serverFloor", "tileLine", "background", "light", "sky", "bounce", "brand", "admin", "klara",
     "klaraTint", "rack", "rackDark", "rackFace", "rackLine", "belt", "scan", "gpu", "gpuLed", "cloud", "hazard", "ok", "danger", "chipMasked",
-    "cable", "keyboard", "lockMetal", "providerA", "providerB", "providerC", "rug", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked"];
+    "cable", "keyboard", "lockMetal", "providerA", "providerB", "providerC", "rug", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked", "xrayShell", "xrayBg", "xrayLine"];
   const FLOOR = 0.02, BELT_Y = 0.33;
   // The sheet's centre rides this high inside the rack and this high above the floor cable (its half-height is ~0.16).
   const RIDE = 0.48, FLOOR_RIDE = 0.23, LANE_Z = 0.55;
   const DESK = { x: 2.6, z: 2.25 }, STAND = [2.6, 3.0], DOOR = [0.8, 5.6];
   const MON = [2.6, 0.99, 2.24];
-  const INLET = [8.58, RIDE, 2.8], SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], GPU_IN = [11.38, RIDE, 2.8];
+  const INLET = [8.58, RIDE, 2.8], SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], GPU_IN = [12.25, 0.49, 2.95];
   const PORT_X = { apiq: 10.9, frontier: 11.5 }, PORT_Z = 1.74, PORT_W = 0.44, GATE = [11.25, RIDE, 0.06];
   const HOLE_TOP = 0.74; // openings in the rack panels and walls reach this high
   const CLOUD = { apiq: [9.3, 3.1, -2.7], frontier: [13.2, 3.1, -2.7] };
   const ADMIN = { x: 5.9, z: 4.15 };
-  const ARROW_ANGLE = { local: 0, apiq: Math.PI / 2, frontier: Math.PI / 4, neutral: -Math.PI / 2 };
+  // The local route turns towards the GPU server cabinet: switch → front of the cabinet → into the chosen server.
+  const LOCAL_TURN = [11.45, 3.45], CAB = { x: 12.25, z: 2.75, chosen: 1 };
+  const ARROW_ANGLE = { local: Math.atan2(-(LOCAL_TURN[1] - 2.8), LOCAL_TURN[0] - 10.9), apiq: Math.PI / 2, frontier: Math.PI / 4, neutral: -Math.PI / 2 };
   const NEEDLE_REST = 1.15;
   const SHOTS = {
     over: { target: [7.2, 1.0, 1.8], span: 8.4, angle: 0.62, elev: 0.6 },
     monitor: { target: [2.6, 0.97, 2.1], span: 1.2, angle: 0.22, elev: 0.3 },
     rackOut: { target: [10.5, 0.6, 2.7], span: 3.9, angle: 0.62, elev: 0.6 },
-    scan: { target: [9.4, 0.6, 2.6], span: 2.8, angle: 0.48, elev: 0.68 },
+    scan: { target: [9.3, 1.05, 2.3], span: 2.75, angle: 0.4, elev: 0.42 },
     gauge: { target: [10.05, 0.55, 2.7], span: 2.3, angle: 0.42, elev: 0.6 },
     route: { target: [11.2, 0.75, 2.45], span: 3.4, angle: 0.5, elev: 0.66 },
-    gpu: { target: [11.8, 0.45, 2.8], span: 2.0, angle: 0.62, elev: 0.6 },
+    gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 },
     admin: { target: [5.9, 1.02, 4.05], span: 1.15, angle: 0.18, elev: 0.28 }
   };
   // Labels: which scenes show them; `route` ties the label to a routing state.
   const LABELS = [
     { id: "desk", text: "Stanowisko pracownika", color: "brand", pos: [2.6, 1.5, 2.1], scenes: ["login", "send", "final"] },
     { id: "admin", text: "Panel administratora", color: "admin", pos: [5.9, 1.55, 4.1], scenes: ["login", "final"] },
-    { id: "reader", text: "Czytnik załączników", color: "scan", pos: [9.2, 0.62, 2.2], scenes: ["scan"] },
+    { id: "monitor", text: "Podgląd skanu", color: "scan", pos: [9.18, 2.08, 1.66], scenes: ["scan", "gauge"] },
     { id: "server", text: "Quantica AI Server", color: "brand", pos: [10.6, 1.5, 3.2], scenes: ["send", "final"] },
-    { id: "scan", text: "Skaner bezpieczeństwa", color: "scan", pos: [9.2, 1.02, 2.8], scenes: ["scan"] },
+    { id: "scan", text: "Skaner rentgenowy", color: "scan", pos: [9.2, 1.06, 2.8], scenes: ["scan"] },
     { id: "gauge", text: "Miernik złożoności", color: "klara", pos: [10.0, 1.18, 2.25], scenes: ["gauge"] },
     { id: "switch", text: "Zwrotnica", color: "klara", pos: [10.9, 0.8, 2.85], scenes: ["route"] },
     { id: "policy", text: "Polityka organizacji", color: "admin", pos: [10.75, 1.86, 1.72], scenes: [] },
-    { id: "local", text: "Model lokalny", color: "ok", pos: [12.15, 1.0, 2.8], scenes: ["route", "model", "final"], route: "local" },
+    { id: "local", text: "Modele lokalne · serwery GPU", color: "ok", pos: [12.25, 1.22, 2.75], scenes: ["route", "model", "final"], route: "local" },
     { id: "gate", text: "Wyjście z organizacji", color: "ok", pos: [11.25, 1.1, 0.06], scenes: ["route", "model", "final"] },
     { id: "apiq", text: "Quantica APIQ", color: "brand", pos: [9.3, 3.95, -2.7], scenes: ["model", "final"], route: "apiq" },
     { id: "frontier", text: "Frontier API", color: "admin", pos: [13.2, 3.95, -2.7], scenes: ["model", "final"], route: "frontier" }
@@ -52,8 +54,8 @@ window.KlaraWorld = (() => {
   const SCENE_ORDER = ["login", "chat", "send", "scan", "gauge", "route", "model", "return", "admin", "final"];
   // Callout anchors share ids with labels: an active callout replaces the plain label.
   const ANCHORS = {
-    server: [10.6, 1.2, 3.4], reader: [9.2, 1.02, 2.1], scan: [9.2, 0.72, 3.05], gauge: [10.27, 0.76, 2.34], switch: [10.9, 0.4, 2.8],
-    policy: [10.75, 1.82, 1.72], local: [12.15, 0.8, 2.8], gate: [11.25, 0.7, 0.06], apiq: [9.3, 3.5, -2.7], frontier: [13.2, 3.5, -2.7]
+    server: [10.6, 1.2, 3.4], monitor: [8.62, 1.6, 1.9], scan: [9.2, 0.9, 3.3], gauge: [10.27, 0.76, 2.34], switch: [10.9, 0.4, 2.8],
+    policy: [10.75, 1.82, 1.72], local: [12.25, 1.1, 2.95], gate: [11.25, 0.7, 0.06], apiq: [9.3, 3.5, -2.7], frontier: [13.2, 3.5, -2.7]
   };
   const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
   const RULE_HIT = ["danger", "ok", "klara"];
@@ -69,9 +71,9 @@ window.KlaraWorld = (() => {
   const colors = {}, materials = {}, geometries = new Map(), refs = {}, paths = {};
   const view = { target: null, span: 8.4, angle: 0.62, elev: 0.6 };
   const user = { yaw: 0, zoom: 1, drag: null };
-  let labelItems = [], lastSig = "", settled = false, spin = 0, coSvg = null;
+  let labelItems = [], lastSig = "", settled = false, coSvg = null;
   const callouts = new Map();
-  const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, arrow: "neutral", barriers: "up", camera: "", callouts: 0, rules: "", pages: 0, attachments: 0, redactions: 0 };
+  const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, arrow: "neutral", barriers: "up", camera: "", callouts: 0, rules: "", scanView: "idle", blade: 0, attachments: 0, redactions: 0 };
 
   // ─── Helpers ───
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -279,11 +281,7 @@ window.KlaraWorld = (() => {
     box(9.7, 2.8, 2.45, 0.34, 0.1, "belt", FLOOR + 0.12);
     for (const z of [2.62, 2.98]) box(9.7, z, 2.45, 0.03, 0.14, "metal", FLOOR + 0.12);
     for (let x = 8.6; x < 10.9; x += 0.3) box(x, 2.8, 0.02, 0.34, 0.003, "rackLine", FLOOR + 0.22);
-    // scanner gate + sweeping light sheet
-    for (const z of [2.55, 3.05]) box(SCAN[0], z, 0.07, 0.07, 0.62, "scan", FLOOR + 0.12, world, 0.02);
-    box(SCAN[0], 2.8, 0.1, 0.57, 0.07, "scan", FLOOR + 0.72, world, 0.02);
-    refs.beamMat = own("scan", { emissive: colors.scan, emissiveIntensity: 1.2, transparent: true, opacity: 0, depthWrite: false });
-    refs.beam = box(SCAN[0], 2.8, 0.16, 0.46, 0.012, refs.beamMat, 0.5); refs.beam.castShadow = false; refs.beam.userData.noCollide = true; // the scan light is meant to sweep over the sheet
+    buildXrayTunnel();
     // gauge: dial with low / mid / high zones and a needle
     box(GAUGE[0], 2.3, 0.08, 0.08, 0.36, "metal", FLOOR + 0.12);
     const dial = group(GAUGE[0], 0.74, 2.32);
@@ -298,7 +296,7 @@ window.KlaraWorld = (() => {
     refs.arrow = group(SWITCH[0], FLOOR + 0.225, SWITCH[2]);
     box(0.06, 0, 0.24, 0.05, 0.02, "klara", 0, refs.arrow); const head = box(0.2, 0, 0.1, 0.1, 0.02, "klara", 0, refs.arrow); head.rotation.y = Math.PI / 4;
     // rails out of the switch
-    strip([11.12, 2.8], [11.6, 2.8], 0.2, 0.04, "belt", FLOOR + 0.12);
+    strip([11.08, 2.98], LOCAL_TURN, 0.2, 0.04, "belt", FLOOR + 0.12); strip(LOCAL_TURN, [CAB.x - 0.3, LOCAL_TURN[1]], 0.2, 0.04, "belt", FLOOR + 0.12);
     strip([10.9, 2.58], [10.9, 1.82], 0.2, 0.04, "belt", FLOOR + 0.12);
     strip([11.05, 2.65], [11.5, 2.2], 0.2, 0.04, "belt", FLOOR + 0.12);
     strip([11.5, 2.2], [11.5, 1.82], 0.2, 0.04, "belt", FLOOR + 0.12);
@@ -312,18 +310,8 @@ window.KlaraWorld = (() => {
       const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.01, 8, 16, Math.PI), material("lockMetal")); shackle.position.y = 0.045; lock.add(shackle);
       lock.scale.setScalar(0.001); refs.locks[key] = lock;
     }
-    // GPU module (the local model) with two fans and an LED strip
-    box(12.15, 2.8, 0.9, 0.8, 0.42, "gpu", FLOOR + 0.12, world, 0.03);
-    for (let i = 0; i < 6; i++) box(11.8 + i * 0.07, 2.8, 0.02, 0.7, 0.05, "rackLine", FLOOR + 0.54);
-    refs.fans = [];
-    for (const z of [2.6, 3.0]) {
-      cylinder(12.42, z, 0.13, 0.02, "rackDark", FLOOR + 0.54);
-      const fan = group(12.42, FLOOR + 0.575, z); for (let k = 0; k < 3; k++) { const b = box(0, 0, 0.22, 0.04, 0.008, "metal", 0, fan); b.rotation.y = k * Math.PI / 3; }
-      refs.fans.push(fan);
-    }
-    refs.gpuMat = own("gpuLed", { emissive: colors.gpuLed, emissiveIntensity: 0.15 });
-    box(12.15, 3.205, 0.72, 0.012, 0.05, refs.gpuMat, FLOOR + 0.3);
-    buildRulesBoard(); buildReader(); buildPlates(); buildTracks();
+    buildServerCabinet();
+    buildRulesBoard(); buildXrayMonitor(); buildPlates(); buildTracks();
     // a couple of plain racks along the wall for context
     for (const x of [13.55, 13.9]) box(x, 0.6, 0.32, 0.7, 1.0, "rack", FLOOR, world, 0.02);
   }
@@ -356,21 +344,98 @@ window.KlaraWorld = (() => {
       row.position.set(0, y, 0.035); g.add(row); refs.ruleRows.push(row.material);
     }
   }
-  // Attachment reader behind the scanner: pages slide out of the packet and are read line by line.
-  function buildReader() {
-    box(9.2, 2.2, 0.78, 0.16, 0.08, "metal", FLOOR + 0.12, world, 0.02);
-    box(9.2, 2.2, 0.7, 0.1, 0.02, "scan", FLOOR + 0.2);
-    refs.barInk = own("ink"); refs.barFlag = own("danger", { emissive: colors.danger, emissiveIntensity: 0.4 });
-    refs.pages = PAGE_FLAGS.map((flags, i) => {
-      const pg = group(); box(0, 0, 0.32, 0.008, 0.42, "paper", -0.21, pg, 0.012);
-      box(-0.06, 0.006, 0.14, 0.003, 0.03, "admin", 0.14, pg);
-      for (let k = 0; k < 4; k++) box(-0.02, 0.006, k % 2 ? 0.2 : 0.25, 0.003, 0.026, flags.includes(k) ? refs.barFlag : refs.barInk, 0.07 - k * 0.075, pg);
-      pg.visible = false; return pg;
+  // X-ray tunnel over the belt: the sheet passes through flexible curtains; an inner light glows while scanning.
+  function buildXrayTunnel() {
+    const x = SCAN[0], L = 0.9, z0 = 2.31, z1 = 3.29, base = FLOOR + 0.12, top = 0.82;
+    box(x, (z0 + z1) / 2, L, z1 - z0, 0.1, "xrayShell", top, world, 0.04);
+    for (const z of [z0 + 0.03, z1 - 0.03]) box(x, z, L, 0.06, top - base, "xrayShell", base);
+    refs.tunnelMat = own("scan", { emissive: colors.scan, emissiveIntensity: 0.1 });
+    box(x, 2.8, L - 0.14, 0.3, 0.02, refs.tunnelMat, top - 0.02);
+    const curtain = own("ink", { transparent: true, opacity: 0.5 });
+    for (const cx of [x - L / 2 - 0.02, x + L / 2 + 0.02]) for (let z = z0 + 0.11; z < z1 - 0.08; z += 0.12) {
+      const strip = box(cx, z, 0.012, 0.1, 0.4, curtain, top - 0.4); strip.castShadow = false;
+      strip.userData.noCollide = true; // flexible strips the sheet pushes through
+    }
+    refs.beaconMat = own("scan", { emissive: colors.scan, emissiveIntensity: 0 });
+    cylinder(x + 0.3, 3.1, 0.04, 0.06, refs.beaconMat, top + 0.1);
+  }
+  // Preview monitor above the back panel: the message on the left, attachments on the right.
+  function buildXrayMonitor() {
+    const W = 1.3, H = 0.775, g = group(SCAN[0] - 0.02, FLOOR + 1.12, 1.66); g.rotation.y = 0.32;
+    box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
+    for (const dx of [-0.45, 0.45]) box(dx, 0.02, 0.05, 0.05, 0.14, "metal", -0.14, g);
+    refs.xrayCanvas = document.createElement("canvas"); refs.xrayCanvas.width = 1024; refs.xrayCanvas.height = 610;
+    refs.xrayTex = new THREE.CanvasTexture(refs.xrayCanvas); refs.xrayTex.colorSpace = THREE.SRGBColorSpace; refs.xrayTex.anisotropy = 4;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: refs.xrayTex, toneMapped: false }));
+    screen.position.set(0, H / 2, 0.03); g.add(screen);
+    refs.xrayKey = ""; drawXray({ view: "idle" });
+  }
+  // What the X-ray screen shows: view = idle | scanning | found | masked | clear.
+  function drawXray(st) {
+    const key = JSON.stringify(st); if (key === refs.xrayKey) return; refs.xrayKey = key;
+    const c = refs.xrayCanvas.getContext("2d"), W = refs.xrayCanvas.width, H = refs.xrayCanvas.height, font = options.font || "sans-serif", mono = "Geist Mono, monospace";
+    const line = colors.xrayLine, red = colors.danger, ink = colors.ink, paper = colors.paper, ok = colors.ok;
+    c.fillStyle = colors.xrayBg; c.fillRect(0, 0, W, H);
+    c.fillStyle = line; c.font = "700 30px " + mono; c.fillText("PODGLĄD SKANU · RENTGEN TREŚCI", 30, 48);
+    c.globalAlpha = 0.25; c.fillRect(30, 64, W - 60, 2); c.globalAlpha = 1;
+    const pane = (x, title) => { c.strokeStyle = line; c.globalAlpha = 0.35; c.lineWidth = 2; c.strokeRect(x, 84, 466, 420); c.globalAlpha = 1; c.fillStyle = line; c.font = "700 22px " + mono; c.fillText(title, x + 16, 116); };
+    pane(30, "WIADOMOŚĆ"); pane(528, "ZAŁĄCZNIK");
+    if (st.view === "idle") { c.fillStyle = line; c.globalAlpha = 0.6; c.font = "500 24px " + mono; c.fillText("oczekiwanie na polecenie…", 46, 560); c.globalAlpha = 1; refs.xrayTex.needsUpdate = true; return; }
+    const tagBar = (x, y, w, item, state) => {
+      if (state === "masked") { c.fillStyle = ink; c.fillRect(x - 4, y - 13, Math.max(w, 120) + 8, 26); c.fillStyle = paper; c.font = "700 17px " + mono; c.fillText(item.token, x + 4, y + 6); }
+      else if (state === "found") { c.fillStyle = red; c.globalAlpha = 0.75; c.fillRect(x - 4, y - 11, w + 8, 22); c.globalAlpha = 1; c.strokeStyle = red; c.lineWidth = 3; c.strokeRect(x - 9, y - 16, w + 18, 32); }
+    };
+    // message: a sheet silhouette with rows of text; protected rows tagged
+    c.strokeStyle = line; c.lineWidth = 3; c.strokeRect(150, 140, 226, 340);
+    c.fillStyle = line; c.globalAlpha = 0.5; const rows = fakeText(c, 170, 190, 186, 8, 36, 9, seeded(7)); c.globalAlpha = 1;
+    (st.msg || []).forEach((item, i) => { const r = rows[[1, 3, 5][i]]; if (r) tagBar(r.words[0][0], r.y, r.words[0][1] - r.words[0][0], item, st.msgState); });
+    // attachment: PDF pages with their protected lines
+    if (!st.att) { c.fillStyle = line; c.globalAlpha = 0.6; c.font = "500 24px " + mono; c.fillText("brak załączników", 640, 300); c.globalAlpha = 1; }
+    else {
+      c.fillStyle = line; c.font = "500 18px " + mono; c.fillText(st.att.name, 546, 148);
+      const items = st.att.items; let k = 0;
+      PAGE_FLAGS.forEach((flags, pIdx) => {
+        const px = 552 + pIdx * 148, py = 170;
+        c.strokeStyle = line; c.lineWidth = 2; c.strokeRect(px, py, 128, 176);
+        c.fillStyle = red; c.fillRect(px + 8, py + 8, 40, 18); c.fillStyle = paper; c.font = "800 12px " + font; c.fillText("PDF", px + 14, py + 22);
+        if (st.attState === "reading" || st.attState === "found" || st.attState === "masked") {
+          c.fillStyle = line; c.globalAlpha = 0.5; const pr = fakeText(c, px + 10, py + 46, 108, 4, 30, 7, seeded(31 + pIdx)); c.globalAlpha = 1;
+          for (const f of flags) { const it = items[k++]; if (it && pr[f]) tagBar(pr[f].words[0][0], pr[f].y, Math.min(70, pr[f].words[0][1] - pr[f].words[0][0]), { token: it.token.length > 9 ? it.token.slice(0, 8) + "]" : it.token }, st.attState); }
+        }
+      });
+      if (st.attState === "found" || st.attState === "masked") {
+        c.font = "600 17px " + mono; let y = 384;
+        for (const it of items) { c.fillStyle = st.attState === "masked" ? line : red; c.fillText((st.attState === "masked" ? it.token + "  " : "! ") + it.kind, 552, y); y += 26; }
+      }
+    }
+    // status line
+    const n = (st.msg || []).length + (st.att ? st.att.items.length : 0);
+    const status = st.view === "scanning" ? ["skanowanie treści…", line] : st.view === "clear" ? ["brak danych chronionych – pakiet może wyjść, jeśli wymaga tego zadanie", ok]
+      : st.view === "found" ? ["wykryto: " + n + " fragmenty chronione", red] : ["zamaskowano " + n + " fragmenty · zakaz wyjścia poza organizację", red];
+    c.fillStyle = status[1]; c.font = "700 24px " + mono; c.fillText(status[0], 46, 560);
+    refs.xrayTex.needsUpdate = true;
+  }
+  // Cabinet of GPU servers (one local model each), fronts facing the viewer; the chosen server slides out.
+  function buildServerCabinet() {
+    const { x, z } = CAB, base = FLOOR + 0.12;
+    for (const [dx, dz] of [[-0.39, -0.32], [0.39, -0.32], [-0.39, 0.32], [0.39, 0.32]]) box(x + dx, z + dz, 0.05, 0.05, 0.95, "metal", base);
+    box(x, z, 0.84, 0.7, 0.04, "rackDark", base + 0.91); box(x, z, 0.84, 0.7, 0.04, "rackDark", base);
+    box(x, z - 0.33, 0.84, 0.03, 0.91, "rackDark", base);
+    refs.blades = [0, 1, 2, 3].map(i => {
+      const g = group(x, base + 0.06 + i * 0.21, z);
+      box(0, 0, 0.7, 0.6, 0.16, "gpu", 0, g, 0.02);
+      const led = own("gpuLed", { emissive: colors.gpuLed, emissiveIntensity: 0.15 });
+      box(0, 0.302, 0.62, 0.01, 0.025, led, 0.02, g);
+      const tex = canvasTexture(512, 64, (c, w, h) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, h); c.fillStyle = colors.rackLine; c.font = "700 34px " + (options.font || "sans-serif"); c.textAlign = "center"; c.fillText("MODEL LOKALNY " + (i + 1), w / 2, 44); });
+      const label = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.075), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); label.position.set(0, 0.11, 0.304); g.add(label);
+      // the chosen server swallows the sheet, so it is exempt from the collision check
+      if (i === CAB.chosen) g.traverse(o => { o.userData.noCollide = true; });
+      return { g, led };
     });
   }
   // Numbered floor plates in front of each station.
   function buildPlates() {
-    const plates = [[9.2, "1", "SKANER", "scan"], [10.0, "2", "ZŁOŻONOŚĆ", "klara"], [10.9, "3", "ZWROTNICA", "admin"], [12.15, "4", "MODEL LOKALNY", "ok"]];
+    const plates = [[9.2, "1", "SKANER", "scan"], [10.0, "2", "ZŁOŻONOŚĆ", "klara"], [10.9, "3", "ZWROTNICA", "admin"], [12.25, "4", "MODELE LOKALNE", "ok"]];
     for (const [x, n, title, tone] of plates) {
       const tex = canvasTexture(512, 192, (c, w, h) => {
         c.fillStyle = colors.rackFace; c.fillRect(0, 0, w, h);
@@ -384,7 +449,7 @@ window.KlaraWorld = (() => {
   }
   // Light strips on the rails: chosen route green, blocked routes red.
   function buildTracks() {
-    const segs = { local: [[[11.12, 2.8], [11.6, 2.8]]], apiq: [[[10.9, 2.58], [10.9, 1.82]]], frontier: [[[11.05, 2.65], [11.5, 2.2]], [[11.5, 2.2], [11.5, 1.82]]] };
+    const segs = { local: [[[11.08, 2.98], LOCAL_TURN], [LOCAL_TURN, [CAB.x - 0.3, LOCAL_TURN[1]]]], apiq: [[[10.9, 2.58], [10.9, 1.82]]], frontier: [[[11.05, 2.65], [11.5, 2.2]], [[11.5, 2.2], [11.5, 1.82]]] };
     refs.tracks = {};
     for (const k of Object.keys(segs)) {
       const m = own("ok", { emissive: colors.ok, emissiveIntensity: 1.2, transparent: true, opacity: 0.9 });
@@ -418,7 +483,7 @@ window.KlaraWorld = (() => {
     const cablePts = [[2.6, 0.92, 2.0], [2.6, 0.92, 1.6], [2.6, 0.06, 1.6], [2.6, 0.06, LANE_Z], [7.95, 0.06, LANE_Z], [7.95, 0.06, 2.8], [8.1, 0.06, 2.8], [8.1, 0.3, 2.8], [8.45, 0.3, 2.8]];
     const inside = [{ line: [INLET, SCAN, GAUGE, SWITCH] }];
     const out = {
-      local: [{ line: [SWITCH, GPU_IN] }],
+      local: [{ line: [SWITCH, [LOCAL_TURN[0], RIDE, LOCAL_TURN[1]], [CAB.x, RIDE, LOCAL_TURN[1]], GPU_IN] }],
       apiq: [{ line: [SWITCH, [10.9, RIDE, PORT_Z], [10.9, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
         { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [CLOUD.apiq[0], CLOUD.apiq[1] + 1.35, CLOUD.apiq[2] + 0.75], [CLOUD.apiq[0], CLOUD.apiq[1] + 0.82, CLOUD.apiq[2]]] }],
       frontier: [{ line: [SWITCH, [11.5, RIDE, 2.2], [11.5, RIDE, PORT_Z], [11.5, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
@@ -578,9 +643,21 @@ window.KlaraWorld = (() => {
     if (id === "send") glowU = clamp((ease(phase(t, 0.05, 0.95)) * refs.sendLen - refs.hopLen) / (refs.sendLen - refs.hopLen));
     else if (o > order("send") && o <= order("return")) glowU = 1;
     refs.glow.visible = glowU > 0; refs.glow.geometry.setDrawRange(0, Math.floor(refs.glowCount * clamp(glowU) / 3) * 3);
-    // scanner beam
-    const sweep = id === "scan" ? phase(t, 0.5, 0.86) : 0;
-    refs.beamMat.opacity = sweep > 0 && sweep < 1 ? 0.75 : 0; refs.beam.position.y = 0.3 + 0.38 * Math.abs(Math.sin(sweep * Math.PI * 2));
+    // X-ray tunnel glows while the sheet is inside; the monitor shows message + attachment findings
+    const scanning = id === "scan" && t > 0.4 && t < 0.88;
+    refs.tunnelMat.emissiveIntensity = scanning ? 1.3 + 0.4 * Math.sin(t * 80) : 0.1; refs.beaconMat.emissiveIntensity = scanning ? 1.6 : 0;
+    const promptItems = s.prompt ? s.prompt.sensitive : [], attItems = s.prompt && s.prompt.attachment ? s.prompt.attachment.sensitive : [];
+    let xv = "idle", msgState = "none", attState = "none";
+    if ((id === "scan" && t >= 0.4) || (o > order("scan") && o <= order("return"))) {
+      const after = o > order("scan");
+      msgState = after || t > 0.72 ? "masked" : t > 0.5 ? "found" : "none";
+      attState = after || t > 0.72 ? "masked" : t > 0.62 ? "found" : t > 0.5 ? "reading" : "none";
+      const any = promptItems.length + attItems.length > 0;
+      xv = !after && t < 0.5 ? "scanning" : !any ? (after || t > 0.72 ? "clear" : "scanning") : msgState === "masked" ? "masked" : "found";
+    }
+    drawXray({ view: xv, msg: xv === "idle" ? [] : promptItems.map(i => ({ token: i.token })), msgState,
+      att: s.prompt && s.prompt.attachment && xv !== "idle" ? { name: s.prompt.attachment.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
+    info.scanView = xv;
     // gauge needle
     const level = d ? (d.level === "high" ? 0.66 : d.level === "routine" ? -0.62 : 0) : 0;
     let needle = NEEDLE_REST;
@@ -606,7 +683,7 @@ window.KlaraWorld = (() => {
     else if (id === "scan") { packetPos = at(paths.inlet2scan, ease(phase(t, 0.3, 0.5))); packetVisible = true; node = t >= 0.5 ? "scan" : "moving"; }
     else if (id === "gauge") { packetPos = at(paths.scan2gauge, ease(phase(t, 0, 0.3))); packetVisible = true; node = t >= 0.3 ? "gauge" : "moving"; }
     else if (id === "route") { packetPos = at(paths.gauge2switch, ease(phase(t, 0, 0.15))); packetVisible = true; node = t >= 0.15 ? "switch" : "moving"; }
-    else if (id === "model") { const end = external ? 0.72 : 0.35; packetPos = at(paths[target], ease(phase(t, 0, end))); packetVisible = true; node = t >= end ? target : "moving"; }
+    else if (id === "model") { const end = external ? 0.72 : 0.4; packetPos = at(paths[target], ease(phase(t, 0, end))); packetVisible = true; node = t >= end ? target : "moving"; }
     else if (id === "return") { packetPos = at(paths["back_" + target], ease(phase(t, 0, 0.82))); answerVisible = true; node = t >= 0.82 ? "desk" : "moving"; }
     for (const k of ["apiq", "frontier"]) {
       const tr = refs.trails[k], u = target !== k ? 0 : id === "model" ? ease(phase(t, 0, 0.72)) : id === "return" ? 1 - phase(t, 0.2, 0.6) : 0;
@@ -616,7 +693,9 @@ window.KlaraWorld = (() => {
     refs.packet.visible = packetVisible; refs.answer.visible = answerVisible;
     const carrier = packetVisible ? refs.packet : answerVisible ? refs.answer : null;
     // the sheet faces the camera and sways a little as it travels
-    if (carrier && packetPos) { carrier.position.copy(packetPos); carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.04; carrier.scale.setScalar(SHEET.scale); }
+    // the chosen GPU server swallows the sheet (model) and hands back the answer (return)
+    const shrink = !external && id === "model" ? 1 - 0.97 * ease(phase(t, 0.28, 0.4)) : !external && id === "return" ? 0.03 + 0.97 * ease(phase(t, 0.02, 0.14)) : 1;
+    if (carrier && packetPos) { carrier.position.copy(packetPos); carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.04; carrier.scale.setScalar(SHEET.scale * shrink); }
     refs.light.intensity = carrier ? 1.0 : 0; if (carrier) refs.light.position.copy(packetPos).add(new THREE.Vector3(0, 0.3, 0.15));
     // protected data: words light up red when the scanner finds them, then turn into black redaction bars
     const masked = o > order("scan") || (id === "scan" && t > 0.72), found = o > order("scan") || (id === "scan" && t > 0.5), docRead = o > order("scan") || (id === "scan" && t > 0.62);
@@ -629,16 +708,6 @@ window.KlaraWorld = (() => {
     refs.pdfs.forEach((pdf, i) => { pdf.g.visible = i < attachments.length; pdf.marks.forEach((mk, k) => redact(mk, docRead && k < attCount)); });
     info.attachments = Math.min(attachments.length, refs.pdfs.length);
     info.redactions = [...refs.msgMarks, ...refs.pdfs.flatMap(pdf => pdf.marks)].filter(mk => mk.bar.visible).length;
-    paint(refs.barFlag, masked);
-    // attachment pages fan out over the reader and fold back once read
-    const out = hasDoc && id === "scan" ? ease(phase(t, 0.42, 0.58)) * (1 - ease(phase(t, 0.86, 0.97))) : 0;
-    refs.pages.forEach((pg, i) => {
-      pg.visible = out > 0.01;
-      if (!pg.visible) return;
-      pg.position.set(lerp(SCAN[0], 8.86 + i * 0.34, out), lerp(RIDE, 0.66 + (i === 1 ? 0.04 : 0), out), lerp(SCAN[2], 2.15, out));
-      pg.rotation.set(-0.35 * out, 0.12 * (i - 1) * out, 0); pg.scale.setScalar(Math.max(0.2, out));
-    });
-    info.pages = out > 0.5 ? refs.pages.length : 0;
     // rules board: lamps light one after another in the route scene
     const rules = Array.isArray(s.rules) ? s.rules : [];
     refs.ruleLamps.forEach((m, i) => {
@@ -655,9 +724,14 @@ window.KlaraWorld = (() => {
       tr.meshes.forEach(m => { m.visible = lit; }); if (lit) { const c = colors[st === "on" ? "ok" : "danger"]; tr.m.color.set(c); tr.m.emissive.set(c); }
     }
     // model at work: GPU glow + fans, gate + cloud glow
-    const work = id === "model" ? (external ? 0 : phase(t, 0.35, 0.55)) : id === "return" && !external ? 1 - phase(t, 0, 0.3) : 0;
-    refs.gpuMat.emissiveIntensity = 0.15 + work * 1.6;
-    spin += dt * (2 + work * 26); refs.fans.forEach((f, i) => { f.rotation.y = spin * (i ? -1 : 1); });
+    const work = id === "model" ? (external ? 0 : phase(t, 0.4, 0.55)) : id === "return" && !external ? 1 - phase(t, 0, 0.3) : 0;
+    const slide = external ? 0 : id === "model" ? ease(phase(t, 0.05, 0.25)) * (1 - ease(phase(t, 0.5, 0.65))) : id === "return" ? 1 - ease(phase(t, 0.3, 0.42)) : 0;
+    refs.blades.forEach((b, i) => {
+      const chosen = i === CAB.chosen;
+      b.g.position.z = CAB.z + (chosen ? slide * 0.3 : 0);
+      b.led.emissiveIntensity = chosen ? 0.15 + Math.max(work, id === "model" && !external && t > 0.4 ? 1 : 0) * 1.6 : 0.15 + 0.1 * (i % 2);
+    });
+    info.blade = +slide.toFixed(2);
     const gateU = id === "model" && external ? 1 - clamp(Math.abs(phase(t, 0, 0.72) - paths[target].gateU) * 9) : 0;
     refs.gateMat.emissiveIntensity = gateU * 1.4;
     for (const key of ["apiq", "frontier"]) refs.cloudMats[key].emissiveIntensity = (id === "model" && target === key ? phase(t, 0.72, 0.85) : id === "return" && target === key ? 1 - phase(t, 0, 0.3) : 0) * 1.5;
@@ -847,7 +921,7 @@ window.KlaraWorld = (() => {
   function debugCollisions(step = 0.02) {
     if (info.renderer !== "webgl") return { ok: false, error: "no webgl" };
     const K = window.KlaraData, key = c => Object.keys(colors).find(k => colors[k] && new THREE.Color(colors[k]).getHex() === c.getHex()) || "#" + c.getHexString();
-    const carriers = new Set(); [refs.packet, refs.answer].forEach(c => c.traverse(o => carriers.add(o))); refs.pages.forEach(pg => pg.traverse(o => carriers.add(o)));
+    const carriers = new Set(); [refs.packet, refs.answer].forEach(c => c.traverse(o => carriers.add(o)));
     const shown = o => { for (let n = o; n; n = n.parent) if (!n.visible) return false; return true; };
     const runs = [["attachment", "apiq"], ["complex", "apiq"], ["complex", "frontier"], ["routine", "apiq"]];
     const scenes = ["send", "scan", "gauge", "route", "model", "return"], hits = new Map(), box = new THREE.Box3(), pt = new THREE.Vector3();

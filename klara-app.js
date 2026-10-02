@@ -121,7 +121,7 @@
     if (id === "send" && t > 0.85) out.push({ id: "server", anchor: "server", side: "top", tone: "brand", kicker: "Quantica AI Server", title: "Decyzja zapada w organizacji",
       lines: [{ text: "polecenie dotarło do serwera organizacji", state: "ok" }, { text: "nic nie wychodzi na zewnątrz przed analizą", state: "on" }] });
     if (id === "scan") {
-      if (att && t > 0.42) out.push({ id: "reader", anchor: "reader", side: "top", tone: "scan", kicker: "Czytnik załączników", title: att.name,
+      if (att && t > 0.5) out.push({ id: "monitor", anchor: "monitor", side: "left", tone: "scan", kicker: "Rentgen załącznika", title: att.name,
         lines: [{ text: att.meta, state: "muted" }, { text: t > 0.58 ? "przeczytano wszystkie strony" : "odczyt stron…", state: t > 0.58 ? "ok" : "muted" }, ...(t > 0.62 ? attItems.map(it => found(it, 0.72)) : [])] });
       if (t > 0.5) out.push({ id: "scan", anchor: "scan", side: "left", tone: "scan", kicker: "Krok 1 · Skaner", title: "Bezpieczeństwo danych",
         lines: [...(own.length ? own.map(it => found(it, 0.72)) : [{ text: "treść polecenia: brak danych chronionych", state: "ok" }]),
@@ -493,7 +493,8 @@
       if (p && state.scene >= IDX.scan && state.scene <= IDX.model && wi.redactions !== items(p).length) failures.push("world-redactions:" + wi.redactions);
       if (p && state.scene >= IDX.send && state.scene <= IDX.model && wi.attachments !== (p.attachment ? 1 : 0)) failures.push("world-attachments:" + wi.attachments);
       if (p && state.scene > IDX.route && (wi.rules.match(/H/g) || []).length !== 1) failures.push("world-rules:" + wi.rules);
-      if (p && p.attachment && ds.scene === "scan" && wi.pages !== 0) failures.push("world-pages-left-out");
+      if (p && ds.scene === "scan" && wi.scanView !== (items(p).length ? "masked" : "clear")) failures.push("world-xray:" + wi.scanView);
+      if (p && ds.scene === "model" && !d.external && wi.blade !== 0) failures.push("world-blade-left-open");
     }
     if (document.body.textContent.includes("\u2014")) failures.push("em-dash");
     return { ok: failures.length === 0, failures, scene: ds.scene, phase: ds.phase, prompt: ds.prompt, route: ds.route, packet: ds.packet, world: wi };
