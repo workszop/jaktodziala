@@ -28,3 +28,11 @@ playwright-report/
 Thumbs.db
 .vscode/
 .idea/
+
+# ─── Credentials: never committed ───
+.aws/
+.aws
+.env
+.env.*
+*.pem
+*.key
