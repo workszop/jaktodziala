@@ -15,7 +15,7 @@ window.KlaraWorld = (() => {
   const FLOOR = 0.02, BELT_Y = 0.33;
   const DESK = { x: 2.6, z: 2.25 }, STAND = [2.6, 3.0], DOOR = [0.8, 5.6];
   const MON = [2.6, 0.99, 2.12];
-  const INLET = [8.58, BELT_Y, 2.8], SCAN = [9.2, BELT_Y, 2.8], GAUGE = [10.0, BELT_Y, 2.8], SWITCH = [10.9, BELT_Y, 2.8], GPU_IN = [11.6, BELT_Y, 2.8];
+  const INLET = [8.58, BELT_Y, 2.8], SCAN = [9.2, BELT_Y, 2.8], GAUGE = [10.0, BELT_Y, 2.8], SWITCH = [10.9, BELT_Y, 2.8], GPU_IN = [11.5, BELT_Y, 2.8];
   const PORT_X = { apiq: 10.9, frontier: 11.5 }, PORT_Z = 1.74, GATE = [11.25, BELT_Y, 0.06];
   const CLOUD = { apiq: [9.3, 3.1, -2.7], frontier: [13.2, 3.1, -2.7] };
   const ADMIN = { x: 5.9, z: 4.15 };
@@ -55,6 +55,10 @@ window.KlaraWorld = (() => {
   const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
   const RULE_HIT = ["danger", "ok", "klara"];
   const PAGE_FLAGS = [[0, 2], [1], [3]];
+  // The message is a sheet of paper; attachments are PDFs clipped onto it.
+  const SHEET = { w: 0.26, h: 0.34, tex: [512, 668], tilt: -1.0, facing: 0.5 };
+  const PDF = { w: 0.17, h: 0.22, tex: [256, 332], max: 2 };
+  const MSG_MARK_ROWS = [1, 3, 5], PDF_MARK_ROWS = [0, 1, 2, 3];
 
   // ─── State ───
   let THREE = null, renderer, scene, camera, world, stage, labelsEl, resizeObserver, sun;
@@ -64,7 +68,7 @@ window.KlaraWorld = (() => {
   const user = { yaw: 0, zoom: 1, drag: null };
   let labelItems = [], lastSig = "", settled = false, spin = 0, coSvg = null;
   const callouts = new Map();
-  const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, arrow: "neutral", barriers: "up", camera: "", callouts: 0, rules: "", pages: 0 };
+  const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, arrow: "neutral", barriers: "up", camera: "", callouts: 0, rules: "", pages: 0, attachments: 0, redactions: 0 };
 
   // ─── Helpers ───
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -420,21 +424,88 @@ window.KlaraWorld = (() => {
     refs.glow = new THREE.Mesh(new THREE.TubeGeometry(cable, 260, 0.032, 6, false), refs.glowMat); world.add(refs.glow);
     refs.glowCount = refs.glow.geometry.index.count; refs.sendLen = paths.send.getLength(); refs.cableLen = cable.getLength(); refs.hopLen = v3(MON).distanceTo(v3(send[0].line[1]));
   }
-  function buildPacket() {
-    refs.packet = group(); refs.packetMat = own("klara", { emissive: colors.klara, emissiveIntensity: 0.55 });
-    box(0, 0, 0.17, 0.17, 0.17, refs.packetMat, -0.085, refs.packet, 0.03);
-    refs.chips = []; refs.chipMats = [];
-    for (let i = 0; i < 4; i++) {
-      const m = own("danger", { emissive: colors.danger, emissiveIntensity: 0.4 }); refs.chipMats.push(m);
-      refs.chips.push(box(-0.06 + i * 0.04, 0.03, 0.032, 0.045, 0.035, m, 0.085, refs.packet, 0.008));
+  // Deterministic pseudo-random numbers so the fake text looks the same on every load.
+  function seeded(seed) {
+    return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function pill(c, x, y, w, h) { c.beginPath(); if (c.roundRect) c.roundRect(x, y, w, h, h / 2); else c.rect(x, y, w, h); c.fill(); }
+  // Unreadable "text": rows of rounded word strokes. Returns the rows so highlights can sit on real words.
+  function fakeText(c, x, y, width, count, gap, thick, rnd) {
+    const rows = [];
+    for (let i = 0; i < count; i++) {
+      const lineW = i === count - 1 ? width * (0.35 + rnd() * 0.25) : width * (0.84 + rnd() * 0.16), words = [];
+      for (let cx = x; cx < x + lineW - 12;) { const ww = Math.min(x + lineW - cx, 22 + rnd() * 70); pill(c, cx, y + i * gap - thick / 2, ww, thick); words.push([cx, cx + ww]); cx += ww + 11 + rnd() * 7; }
+      rows.push({ y: y + i * gap, words });
     }
-    refs.doc = group(0.105, 0, 0, refs.packet); refs.doc.rotation.y = 0.25;
-    box(0, 0, 0.02, 0.12, 0.15, "paper", -0.075, refs.doc, 0.005);
-    refs.docStripe = own("danger", { emissive: colors.danger, emissiveIntensity: 0.35 });
-    box(0.011, 0, 0.004, 0.1, 0.025, refs.docStripe, 0.03, refs.doc);
-    refs.answer = group();
-    box(0, 0, 0.19, 0.14, 0.15, "paper", -0.075, refs.answer, 0.03); box(0, 0, 0.2, 0.15, 0.03, "ok", -0.015, refs.answer, 0.01);
-    refs.light = new THREE.PointLight(colors.klara, 0, 1.8, 1.6); world.add(refs.light);
+    return rows;
+  }
+  // Texture px -> local plane coordinates.
+  const toPlane = (px, py, [tw, th], w, h) => [(px / tw - 0.5) * w, (0.5 - py / th) * h];
+  function sheetTexture(accent, rows, seed) {
+    let layout = null;
+    const tex = canvasTexture(SHEET.tex[0], SHEET.tex[1], (c, w, h) => {
+      c.fillStyle = colors.paper; c.fillRect(0, 0, w, h);
+      c.fillStyle = colors[accent]; c.fillRect(0, 0, w, 16); c.beginPath(); c.arc(62, 72, 22, 0, Math.PI * 2); c.fill();
+      c.fillStyle = colors.ink; pill(c, 100, 60, 190, 24);
+      c.fillStyle = colors.rackLine; layout = fakeText(c, 40, 150, w - 80, rows, 60, 16, seeded(seed));
+    });
+    return { tex, layout };
+  }
+  function pdfTexture(seed) {
+    let layout = null;
+    const tex = canvasTexture(PDF.tex[0], PDF.tex[1], (c, w, h) => {
+      c.fillStyle = colors.paper; c.fillRect(0, 0, w, h);
+      c.fillStyle = colors.cream; c.beginPath(); c.moveTo(w - 54, 0); c.lineTo(w, 54); c.lineTo(w - 54, 54); c.closePath(); c.fill();
+      c.fillStyle = colors.danger; c.beginPath(); if (c.roundRect) c.roundRect(18, 22, 86, 40, 8); else c.rect(18, 22, 86, 40); c.fill();
+      c.fillStyle = colors.paper; c.font = "800 26px " + (options.font || "sans-serif"); c.fillText("PDF", 33, 52);
+      c.fillStyle = colors.rackLine; layout = fakeText(c, 20, 104, w - 40, 6, 36, 11, seeded(seed));
+    });
+    return { tex, layout };
+  }
+  // Highlight bars over chosen words: red while found, black redaction bars once masked.
+  function markBars(parent, layout, rowIdx, texSize, w, h, thick) {
+    return rowIdx.map(r => {
+      const row = layout[Math.min(r, layout.length - 1)], word = row.words.reduce((a, b) => (b[1] - b[0] > a[1] - a[0] ? b : a));
+      const [x0] = toPlane(word[0] - 5, row.y, texSize, w, h), [x1, y] = toPlane(word[1] + 5, row.y, texSize, w, h);
+      const m = own("danger", { emissive: colors.danger, emissiveIntensity: 0.4 });
+      const bar = box((x0 + x1) / 2, 0.0025, x1 - x0, 0.002, thick, m, y - thick / 2, parent); bar.castShadow = false; bar.visible = false;
+      return { bar, m };
+    });
+  }
+  function paperclip(parent, x, y) {
+    const pts = [[0, -0.05], [0, 0.03], [0.009, 0.042], [0.018, 0.03], [0.018, -0.038], [0.012, -0.046], [0.006, -0.038], [0.006, 0.018]]
+      .map(([px, py]) => new THREE.Vector3(px, py, 0));
+    const clip = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0028, 6, false), material("metal"));
+    clip.position.set(x, y, 0.004); parent.add(clip);
+  }
+  function buildSheet(accent, edgeMat, seed, rows) {
+    const g = group(), tilt = group(0, 0, 0, g); tilt.rotation.x = SHEET.tilt;
+    const edge = new THREE.Mesh(geo("plane", [SHEET.w + 0.024, SHEET.h + 0.024], () => new THREE.PlaneGeometry(SHEET.w + 0.024, SHEET.h + 0.024)), edgeMat);
+    edge.position.z = -0.003; tilt.add(edge);
+    const { tex, layout } = sheetTexture(accent, rows, seed);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(SHEET.w, SHEET.h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, side: THREE.DoubleSide }));
+    face.castShadow = true; tilt.add(face);
+    return { g, tilt, layout };
+  }
+  function buildPacket() {
+    refs.packetMat = own("klara", { emissive: colors.klara, emissiveIntensity: 0.9 });
+    const msg = buildSheet("klara", refs.packetMat, 7, 8);
+    refs.packet = msg.g;
+    refs.msgMarks = markBars(msg.tilt, msg.layout, MSG_MARK_ROWS, SHEET.tex, SHEET.w, SHEET.h, 0.026);
+    // attachments: PDF pages clipped onto the lower-right of the sheet, stacked when there are several
+    refs.pdfs = [];
+    for (let i = 0; i < PDF.max; i++) {
+      const pg = group(0.075 + i * 0.03, -0.07 - i * 0.025, 0.008 - i * 0.004, msg.tilt); pg.rotation.z = -0.12 + i * 0.1;
+      const shadow = new THREE.Mesh(geo("plane", [PDF.w + 0.01, PDF.h + 0.01], () => new THREE.PlaneGeometry(PDF.w + 0.01, PDF.h + 0.01)), material("chipMasked"));
+      shadow.position.set(0.004, -0.004, -0.001); pg.add(shadow);
+      const { tex, layout } = pdfTexture(31 + i * 17);
+      pg.add(new THREE.Mesh(new THREE.PlaneGeometry(PDF.w, PDF.h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, side: THREE.DoubleSide })));
+      paperclip(pg, 0.004, PDF.h / 2 - 0.01);
+      refs.pdfs.push({ g: pg, marks: i === 0 ? markBars(pg, layout, PDF_MARK_ROWS, PDF.tex, PDF.w, PDF.h, 0.018) : [] });
+    }
+    const answerEdge = own("ok", { emissive: colors.ok, emissiveIntensity: 0.9 });
+    refs.answer = buildSheet("ok", answerEdge, 11, 6).g;
+    refs.light = new THREE.PointLight(colors.klara, 0, 1.6, 1.6); world.add(refs.light);
     refs.packet.visible = refs.answer.visible = false;
   }
 
@@ -522,15 +593,21 @@ window.KlaraWorld = (() => {
     info.packetNode = node;
     refs.packet.visible = packetVisible; refs.answer.visible = answerVisible;
     const carrier = packetVisible ? refs.packet : answerVisible ? refs.answer : null;
-    if (carrier && packetPos) { carrier.position.copy(packetPos); carrier.rotation.y = (id === "return" ? -1 : 1) * t * 3; }
-    refs.light.intensity = carrier ? 1.6 : 0; if (carrier) refs.light.position.copy(packetPos).add(new THREE.Vector3(0, 0.25, 0));
-    // protected-data chips: prompt items ride from the start, attachment items appear once the reader finds them
-    const masked = o > order("scan") || (id === "scan" && t > 0.72), docRead = o > order("scan") || (id === "scan" && t > 0.62);
-    refs.chips.forEach((c, i) => { c.visible = i < promptCount || (i < total && docRead); c.scale.y = masked ? 0.45 : 1; });
+    // the sheet faces the camera and sways a little as it travels
+    if (carrier && packetPos) { carrier.position.copy(packetPos).add(new THREE.Vector3(0, 0.05, 0)); carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.06; carrier.scale.setScalar(1.15); }
+    refs.light.intensity = carrier ? 1.0 : 0; if (carrier) refs.light.position.copy(packetPos).add(new THREE.Vector3(0, 0.3, 0.15));
+    // protected data: words light up red when the scanner finds them, then turn into black redaction bars
+    const masked = o > order("scan") || (id === "scan" && t > 0.72), found = o > order("scan") || (id === "scan" && t > 0.5), docRead = o > order("scan") || (id === "scan" && t > 0.62);
     const pulse = id === "scan" && t > 0.5 && t < 0.72 ? 0.5 * Math.abs(Math.sin(t * 60)) : 0;
     const paint = (m, on) => { const c = colors[on ? "chipMasked" : "danger"]; m.color.set(c); m.emissive.set(c); m.emissiveIntensity = on ? 0.05 : 0.35 + pulse; };
-    refs.chipMats.forEach(m => paint(m, masked)); paint(refs.docStripe, masked); paint(refs.barFlag, masked);
-    refs.doc.visible = hasDoc;
+    const redact = (mk, show) => { mk.bar.visible = show; if (!show) return; const c = colors[masked ? "ink" : "danger"]; mk.m.color.set(c); mk.m.emissive.set(c); mk.m.emissiveIntensity = masked ? 0 : 0.45 + pulse; };
+    refs.msgMarks.forEach((mk, i) => redact(mk, found && i < promptCount));
+    const attachments = s.prompt ? (s.prompt.attachments || (s.prompt.attachment ? [s.prompt.attachment] : [])) : [];
+    const attCount = Math.max(0, total - promptCount);
+    refs.pdfs.forEach((pdf, i) => { pdf.g.visible = i < attachments.length; pdf.marks.forEach((mk, k) => redact(mk, docRead && k < attCount)); });
+    info.attachments = Math.min(attachments.length, refs.pdfs.length);
+    info.redactions = [...refs.msgMarks, ...refs.pdfs.flatMap(pdf => pdf.marks)].filter(mk => mk.bar.visible).length;
+    paint(refs.barFlag, masked);
     // attachment pages fan out over the reader and fold back once read
     const out = hasDoc && id === "scan" ? ease(phase(t, 0.42, 0.58)) * (1 - ease(phase(t, 0.86, 0.97))) : 0;
     refs.pages.forEach((pg, i) => {

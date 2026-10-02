@@ -490,6 +490,8 @@
       if (p && state.scene > IDX.route && wi.arrow !== d.target) failures.push("world-arrow");
       if (p && items(p).length && state.scene > IDX.route && wi.barriers !== "down") failures.push("world-barriers");
       if (p && ["scan", "gauge", "route", "model"].includes(ds.scene) && wi.callouts < 1) failures.push("world-callouts");
+      if (p && state.scene >= IDX.scan && state.scene <= IDX.model && wi.redactions !== items(p).length) failures.push("world-redactions:" + wi.redactions);
+      if (p && state.scene >= IDX.send && state.scene <= IDX.model && wi.attachments !== (p.attachment ? 1 : 0)) failures.push("world-attachments:" + wi.attachments);
       if (p && state.scene > IDX.route && (wi.rules.match(/H/g) || []).length !== 1) failures.push("world-rules:" + wi.rules);
       if (p && p.attachment && ds.scene === "scan" && wi.pages !== 0) failures.push("world-pages-left-out");
     }
