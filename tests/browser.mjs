@@ -31,6 +31,8 @@ try {
   await page.goto(BASE); await ready(page);
   const st = await page.evaluate(() => App.selfTest());
   check("self-test: prompts × policies × scenes", st.ok, st.failures.slice(0, 3).join(" | "));
+  const col = await page.evaluate(() => KlaraWorld.debugCollisions());
+  check("travelling sheet never passes through scene geometry", col.ok, (col.hits || []).slice(0, 3).map(h => h.scene + "@" + h.t0 + " " + h.mesh).join(" | "));
 
   // 2) real-time keyboard playthrough of a protected-data run
   await page.keyboard.press("r");

@@ -13,10 +13,13 @@ window.KlaraWorld = (() => {
     "klaraTint", "rack", "rackDark", "rackFace", "rackLine", "belt", "scan", "gpu", "gpuLed", "cloud", "hazard", "ok", "danger", "chipMasked",
     "cable", "keyboard", "lockMetal", "providerA", "providerB", "providerC", "rug", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked"];
   const FLOOR = 0.02, BELT_Y = 0.33;
+  // The sheet's centre rides this high inside the rack and this high above the floor cable (its half-height is ~0.16).
+  const RIDE = 0.48, FLOOR_RIDE = 0.23, LANE_Z = 0.55;
   const DESK = { x: 2.6, z: 2.25 }, STAND = [2.6, 3.0], DOOR = [0.8, 5.6];
-  const MON = [2.6, 0.99, 2.12];
-  const INLET = [8.58, BELT_Y, 2.8], SCAN = [9.2, BELT_Y, 2.8], GAUGE = [10.0, BELT_Y, 2.8], SWITCH = [10.9, BELT_Y, 2.8], GPU_IN = [11.5, BELT_Y, 2.8];
-  const PORT_X = { apiq: 10.9, frontier: 11.5 }, PORT_Z = 1.74, GATE = [11.25, BELT_Y, 0.06];
+  const MON = [2.6, 0.99, 2.24];
+  const INLET = [8.58, RIDE, 2.8], SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], GPU_IN = [11.38, RIDE, 2.8];
+  const PORT_X = { apiq: 10.9, frontier: 11.5 }, PORT_Z = 1.74, PORT_W = 0.44, GATE = [11.25, RIDE, 0.06];
+  const HOLE_TOP = 0.74; // openings in the rack panels and walls reach this high
   const CLOUD = { apiq: [9.3, 3.1, -2.7], frontier: [13.2, 3.1, -2.7] };
   const ADMIN = { x: 5.9, z: 4.15 };
   const ARROW_ANGLE = { local: 0, apiq: Math.PI / 2, frontier: Math.PI / 4, neutral: -Math.PI / 2 };
@@ -56,7 +59,7 @@ window.KlaraWorld = (() => {
   const RULE_HIT = ["danger", "ok", "klara"];
   const PAGE_FLAGS = [[0, 2], [1], [3]];
   // The message is a sheet of paper; attachments are PDFs clipped onto it.
-  const SHEET = { w: 0.26, h: 0.34, tex: [512, 668], tilt: -1.0, facing: 0.5 };
+  const SHEET = { w: 0.26, h: 0.34, tex: [512, 668], tilt: -0.6, facing: 0.25, scale: 1.15 };
   const PDF = { w: 0.17, h: 0.22, tex: [256, 332], max: 2 };
   const MSG_MARK_ROWS = [1, 3, 5], PDF_MARK_ROWS = [0, 1, 2, 3];
 
@@ -162,19 +165,24 @@ window.KlaraWorld = (() => {
     box(3.75, 0.06, 7.5, 0.12, 1.1, "wall");
     box(0.06, 3.0, 0.12, 6.0, 1.1, "wall");
     for (let i = 0; i < 4; i++) box(1.0 + i * 1.75, 0.125, 1.15, 0.02, 0.5, "glass", 0.4);
-    box(9.25, 0.06, 3.5, 0.12, 1.1, "wallServer");
-    box(12.85, 0.06, 2.7, 0.12, 1.1, "wallServer");
-    box(11.25, 0.06, 0.5, 0.12, 0.5, "wallServer", 0.6);
+    const gx0 = 10.92, gx1 = 11.58; // exit opening in the server back wall
+    box((7.5 + gx0) / 2, 0.06, gx0 - 7.5, 0.12, 1.1, "wallServer");
+    box((gx1 + 14.2) / 2, 0.06, 14.2 - gx1, 0.12, 1.1, "wallServer");
+    box((gx0 + gx1) / 2, 0.06, gx1 - gx0, 0.12, 1.1 - HOLE_TOP, "wallServer", HOLE_TOP);
     // glass partition between office and server room (door gap at z 4.4–5.4)
     const glass = own("glass", { transparent: true, opacity: 0.32, depthWrite: false });
-    for (const [z0, z1] of [[0.12, 4.4], [5.4, 6.0]]) {
+    const pass = [LANE_Z - 0.26, LANE_Z + 0.26], passTop = 0.52; // cable pass-through near the floor
+    for (const [z0, z1] of [[0.12, pass[0]], [pass[1], 4.4], [5.4, 6.0]]) {
       box(7.55, (z0 + z1) / 2, 0.04, z1 - z0, 1.0, glass);
-      box(7.55, (z0 + z1) / 2, 0.07, z1 - z0, 0.05, "metal", 1.0);
       for (const z of [z0, z1]) box(7.55, z, 0.07, 0.07, 1.05, "metal");
     }
+    box(7.55, LANE_Z, 0.04, pass[1] - pass[0], 1.0 - passTop, glass, passTop);
+    box(7.55, LANE_Z, 0.07, pass[1] - pass[0], 0.04, "metal", passTop - 0.04);
+    box(7.55, 3.0, 0.07, 5.88, 0.05, "metal", 1.0);
     // exit gate in the server back wall
     refs.gateMat = own("ok", { emissive: colors.ok, emissiveIntensity: 0 });
-    box(11.0, 0.16, 0.06, 0.12, 0.62, refs.gateMat); box(11.5, 0.16, 0.06, 0.12, 0.62, refs.gateMat); box(11.25, 0.16, 0.56, 0.12, 0.06, refs.gateMat, 0.62);
+    box(gx0 + 0.03, 0.16, 0.06, 0.12, HOLE_TOP, refs.gateMat); box(gx1 - 0.03, 0.16, 0.06, 0.12, HOLE_TOP, refs.gateMat);
+    box((gx0 + gx1) / 2, 0.16, gx1 - gx0, 0.12, 0.06, refs.gateMat, HOLE_TOP);
   }
 
   // ─── Build: office ───
@@ -205,7 +213,7 @@ window.KlaraWorld = (() => {
     deskAt(4.75, 0.95 + 0.3, own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }));
     box(0.42, 1.4, 0.5, 0.9, 1.0, "wood", 0, world, 0.02);
     for (let i = 0; i < 3; i++) for (let k = 0; k < 4; k++) box(0.68, 1.08 + k * 0.2, 0.02, 0.14, 0.22, ["upholstery", "klara", "admin", "metal"][k], 0.08 + i * 0.32);
-    plant(0.55, 0.5); plant(7.1, 5.6, 1.15); plant(6.95, 0.5, 0.9);
+    plant(0.55, 0.5); plant(7.1, 5.6, 1.15); plant(7.15, 3.4, 0.9);
     // admin console: pedestal + tilted screen
     box(ADMIN.x, ADMIN.z, 0.5, 0.36, 0.78, "rack", 0, world, 0.04);
     const head = group(ADMIN.x, 0.86, ADMIN.z); head.rotation.x = -0.5;
@@ -232,11 +240,23 @@ window.KlaraWorld = (() => {
   function buildRack() {
     const cx = 10.6, cz = 2.8, w = 4.6, d = 2.2, h = 1.1;
     box(cx, cz, w, d, 0.12, "rackDark", FLOOR, world, 0.03);
-    box(cx, cz - d / 2 + 0.04, w, 0.08, h, "rack", FLOOR);
-    box(cx - w / 2 + 0.04, cz, 0.08, d, h, "rack", FLOOR);
+    const x0 = cx - w / 2, x1 = cx + w / 2, z0 = cz - d / 2, z1 = cz + d / 2, base = FLOOR + 0.12;
+    // back panel with two port openings
+    const ports = [PORT_X.apiq, PORT_X.frontier].map(x => [x - PORT_W / 2, x + PORT_W / 2]);
+    const solid = [[x0, ports[0][0]], [ports[0][1], ports[1][0]], [ports[1][1], x1]];
+    for (const [a, b] of solid) box((a + b) / 2, z0 + 0.04, b - a, 0.08, h, "rack", FLOOR);
+    for (const [a, b] of ports) {
+      box((a + b) / 2, z0 + 0.04, b - a, 0.08, FLOOR + h - HOLE_TOP, "rack", HOLE_TOP);
+      box((a + b) / 2, z0 + 0.04, b - a, 0.08, base - FLOOR, "rack", FLOOR);
+      box((a + b) / 2, z0 + 0.085, b - a + 0.04, 0.012, 0.03, "metal", HOLE_TOP - 0.03);
+    }
+    // left side panel with the cable inlet
+    const inlet = [cz - 0.25, cz + 0.25];
+    for (const [a, b] of [[z0, inlet[0]], [inlet[1], z1]]) box(x0 + 0.04, (a + b) / 2, 0.08, b - a, h, "rack", FLOOR);
+    box(x0 + 0.04, cz, 0.08, inlet[1] - inlet[0], FLOOR + h - HOLE_TOP, "rack", HOLE_TOP);
+    box(x0 + 0.04, cz, 0.08, inlet[1] - inlet[0], base - FLOOR, "rack", FLOOR);
+    box(x0 - 0.005, cz, 0.012, inlet[1] - inlet[0] + 0.04, 0.03, "metal", HOLE_TOP - 0.03);
     box(cx + w / 2 - 0.04, cz, 0.08, d, h, "rack", FLOOR);
-    for (const x of [PORT_X.apiq, PORT_X.frontier]) box(x, PORT_Z + 0.05, 0.26, 0.012, 0.26, "ink", BELT_Y - 0.16);
-    box(8.36, 2.8, 0.012, 0.24, 0.22, "ink", BELT_Y - 0.14);
     // lid + front cover open in the scan scene
     refs.lidMat = own("rackFace", { transparent: true, opacity: 1 });
     refs.lid = box(cx, cz, w + 0.02, d + 0.02, 0.06, refs.lidMat, FLOOR + h);
@@ -263,7 +283,7 @@ window.KlaraWorld = (() => {
     for (const z of [2.55, 3.05]) box(SCAN[0], z, 0.07, 0.07, 0.62, "scan", FLOOR + 0.12, world, 0.02);
     box(SCAN[0], 2.8, 0.1, 0.57, 0.07, "scan", FLOOR + 0.72, world, 0.02);
     refs.beamMat = own("scan", { emissive: colors.scan, emissiveIntensity: 1.2, transparent: true, opacity: 0, depthWrite: false });
-    refs.beam = box(SCAN[0], 2.8, 0.16, 0.46, 0.012, refs.beamMat, 0.5); refs.beam.castShadow = false;
+    refs.beam = box(SCAN[0], 2.8, 0.16, 0.46, 0.012, refs.beamMat, 0.5); refs.beam.castShadow = false; refs.beam.userData.noCollide = true; // the scan light is meant to sweep over the sheet
     // gauge: dial with low / mid / high zones and a needle
     box(GAUGE[0], 2.3, 0.08, 0.08, 0.36, "metal", FLOOR + 0.12);
     const dial = group(GAUGE[0], 0.74, 2.32);
@@ -286,8 +306,8 @@ window.KlaraWorld = (() => {
     refs.barriers = {}; refs.locks = {};
     for (const key of ["apiq", "frontier"]) {
       const x = PORT_X[key];
-      box(x + 0.16, 2.0, 0.04, 0.04, 0.46, "metal", FLOOR + 0.12);
-      const pivot = group(x + 0.16, FLOOR + 0.52, 2.0); box(-0.17, 0, 0.36, 0.035, 0.035, "hazard", -0.017, pivot); refs.barriers[key] = pivot;
+      box(x + 0.25, 2.0, 0.04, 0.04, 0.5, "metal", FLOOR + 0.12);
+      const pivot = group(x + 0.25, FLOOR + 0.56, 2.0); box(-0.24, 0, 0.5, 0.035, 0.035, "hazard", -0.017, pivot); refs.barriers[key] = pivot;
       const lock = group(x, FLOOR + 0.78, 2.0); box(0, 0, 0.11, 0.05, 0.09, "lockMetal", -0.045, lock, 0.015);
       const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.01, 8, 16, Math.PI), material("lockMetal")); shackle.position.y = 0.045; lock.add(shackle);
       lock.scale.setScalar(0.001); refs.locks[key] = lock;
@@ -393,14 +413,16 @@ window.KlaraWorld = (() => {
 
   // ─── Build: packet, cable, paths ───
   function buildPaths() {
-    const send = [{ line: [MON, [2.6, 0.9, 1.97], [2.6, 0.74, 1.86], [2.6, 0.06, 1.86], [2.6, 0.06, 1.0], [7.95, 0.06, 1.0], [7.95, 0.06, 2.8], [8.2, 0.06, 2.8], [8.2, BELT_Y, 2.8], INLET] }];
+    const hop = [MON, [2.6, 1.46, MON[2]], [2.6, 1.46, 1.6]];
+    const send = [{ line: [...hop, [2.6, FLOOR_RIDE, 1.6], [2.6, FLOOR_RIDE, LANE_Z], [7.95, FLOOR_RIDE, LANE_Z], [7.95, FLOOR_RIDE, 2.8], [7.95, RIDE, 2.8], INLET] }];
+    const cablePts = [[2.6, 0.92, 2.0], [2.6, 0.92, 1.6], [2.6, 0.06, 1.6], [2.6, 0.06, LANE_Z], [7.95, 0.06, LANE_Z], [7.95, 0.06, 2.8], [8.1, 0.06, 2.8], [8.1, 0.3, 2.8], [8.45, 0.3, 2.8]];
     const inside = [{ line: [INLET, SCAN, GAUGE, SWITCH] }];
     const out = {
       local: [{ line: [SWITCH, GPU_IN] }],
-      apiq: [{ line: [SWITCH, [10.9, BELT_Y, PORT_Z], [10.9, BELT_Y, 1.3], [11.25, BELT_Y, 0.9], GATE, [11.25, BELT_Y, -0.5]] },
-        { curve: [[11.25, BELT_Y, -0.5], [11.0, 1.4, -1.2], [10.1, 2.6, -2.2], [CLOUD.apiq[0], CLOUD.apiq[1] + 0.6, CLOUD.apiq[2]]] }],
-      frontier: [{ line: [SWITCH, [11.5, BELT_Y, 2.2], [11.5, BELT_Y, PORT_Z], [11.5, BELT_Y, 1.3], [11.25, BELT_Y, 0.9], GATE, [11.25, BELT_Y, -0.5]] },
-        { curve: [[11.25, BELT_Y, -0.5], [11.6, 1.4, -1.2], [12.5, 2.6, -2.2], [CLOUD.frontier[0], CLOUD.frontier[1] + 0.6, CLOUD.frontier[2]]] }]
+      apiq: [{ line: [SWITCH, [10.9, RIDE, PORT_Z], [10.9, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
+        { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [CLOUD.apiq[0], CLOUD.apiq[1] + 1.35, CLOUD.apiq[2] + 0.75], [CLOUD.apiq[0], CLOUD.apiq[1] + 0.82, CLOUD.apiq[2]]] }],
+      frontier: [{ line: [SWITCH, [11.5, RIDE, 2.2], [11.5, RIDE, PORT_Z], [11.5, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
+        { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [CLOUD.frontier[0], CLOUD.frontier[1] + 1.35, CLOUD.frontier[2] + 0.75], [CLOUD.frontier[0], CLOUD.frontier[1] + 0.82, CLOUD.frontier[2]]] }]
     };
     paths.send = makePath(send);
     paths.inlet2scan = makePath([{ line: [INLET, SCAN] }]); paths.scan2gauge = makePath([{ line: [SCAN, GAUGE] }]); paths.gauge2switch = makePath([{ line: [GAUGE, SWITCH] }]);
@@ -413,16 +435,16 @@ window.KlaraWorld = (() => {
     refs.trails = {};
     for (const k of ["apiq", "frontier"]) {
       const m = own("klara", { emissive: colors.klara, emissiveIntensity: 1.1, transparent: true, opacity: 0.7 });
-      const tr = new THREE.Mesh(new THREE.TubeGeometry(paths[k], 220, 0.018, 6, false), m); tr.visible = false; world.add(tr);
+      const tr = new THREE.Mesh(new THREE.TubeGeometry(paths[k], 220, 0.018, 6, false), m); tr.visible = false; tr.userData.noCollide = true; world.add(tr);
       refs.trails[k] = { mesh: tr, count: tr.geometry.index.count };
     }
     // cable along the send route (excluding the hop out of the screen)
-    const cable = makePath([{ line: send[0].line.slice(1, -1) }]);
+    const cable = makePath([{ line: cablePts }]);
     const tube = new THREE.TubeGeometry(cable, 260, 0.024, 6, false);
-    mesh(tube, "cable");
+    mesh(tube, "cable").userData.noCollide = true;
     refs.glowMat = own("klara", { emissive: colors.klara, emissiveIntensity: 1.1, transparent: true, opacity: 0.85 });
-    refs.glow = new THREE.Mesh(new THREE.TubeGeometry(cable, 260, 0.032, 6, false), refs.glowMat); world.add(refs.glow);
-    refs.glowCount = refs.glow.geometry.index.count; refs.sendLen = paths.send.getLength(); refs.cableLen = cable.getLength(); refs.hopLen = v3(MON).distanceTo(v3(send[0].line[1]));
+    refs.glow = new THREE.Mesh(new THREE.TubeGeometry(cable, 260, 0.032, 6, false), refs.glowMat); refs.glow.userData.noCollide = true; world.add(refs.glow);
+    refs.glowCount = refs.glow.geometry.index.count; refs.sendLen = paths.send.getLength(); refs.cableLen = cable.getLength(); refs.hopLen = makePath([{ line: hop }]).getLength();
   }
   // Deterministic pseudo-random numbers so the fake text looks the same on every load.
   function seeded(seed) {
@@ -553,7 +575,7 @@ window.KlaraWorld = (() => {
     info.rackOpen = +open.toFixed(2);
     // cable glow
     let glowU = 0;
-    if (id === "send") glowU = clamp((ease(phase(t, 0.05, 0.95)) * refs.sendLen - refs.hopLen) / refs.cableLen);
+    if (id === "send") glowU = clamp((ease(phase(t, 0.05, 0.95)) * refs.sendLen - refs.hopLen) / (refs.sendLen - refs.hopLen));
     else if (o > order("send") && o <= order("return")) glowU = 1;
     refs.glow.visible = glowU > 0; refs.glow.geometry.setDrawRange(0, Math.floor(refs.glowCount * clamp(glowU) / 3) * 3);
     // scanner beam
@@ -594,7 +616,7 @@ window.KlaraWorld = (() => {
     refs.packet.visible = packetVisible; refs.answer.visible = answerVisible;
     const carrier = packetVisible ? refs.packet : answerVisible ? refs.answer : null;
     // the sheet faces the camera and sways a little as it travels
-    if (carrier && packetPos) { carrier.position.copy(packetPos).add(new THREE.Vector3(0, 0.05, 0)); carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.06; carrier.scale.setScalar(1.15); }
+    if (carrier && packetPos) { carrier.position.copy(packetPos); carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.04; carrier.scale.setScalar(SHEET.scale); }
     refs.light.intensity = carrier ? 1.0 : 0; if (carrier) refs.light.position.copy(packetPos).add(new THREE.Vector3(0, 0.3, 0.15));
     // protected data: words light up red when the scanner finds them, then turn into black redaction bars
     const masked = o > order("scan") || (id === "scan" && t > 0.72), found = o > order("scan") || (id === "scan" && t > 0.5), docRead = o > order("scan") || (id === "scan" && t > 0.62);
@@ -613,7 +635,7 @@ window.KlaraWorld = (() => {
     refs.pages.forEach((pg, i) => {
       pg.visible = out > 0.01;
       if (!pg.visible) return;
-      pg.position.set(lerp(SCAN[0], 8.86 + i * 0.34, out), lerp(BELT_Y, 0.62 + (i === 1 ? 0.04 : 0), out), lerp(SCAN[2], 2.15, out));
+      pg.position.set(lerp(SCAN[0], 8.86 + i * 0.34, out), lerp(RIDE, 0.66 + (i === 1 ? 0.04 : 0), out), lerp(SCAN[2], 2.15, out));
       pg.rotation.set(-0.35 * out, 0.12 * (i - 1) * out, 0); pg.scale.setScalar(Math.max(0.2, out));
     });
     info.pages = out > 0.5 ? refs.pages.length : 0;
@@ -819,5 +841,45 @@ window.KlaraWorld = (() => {
     if (options.onFail) options.onFail(message);
   }
 
-  return { init, frame, resetView, info: () => ({ ...info }) };
+  // ─── Diagnostics: does the travelling sheet pass through scene geometry? ───
+  // Replays every travelling scene in small steps, samples points on the sheet/PDF/answer planes and reports
+  // the visible meshes whose world bounding box contains a sample point.
+  function debugCollisions(step = 0.02) {
+    if (info.renderer !== "webgl") return { ok: false, error: "no webgl" };
+    const K = window.KlaraData, key = c => Object.keys(colors).find(k => colors[k] && new THREE.Color(colors[k]).getHex() === c.getHex()) || "#" + c.getHexString();
+    const carriers = new Set(); [refs.packet, refs.answer].forEach(c => c.traverse(o => carriers.add(o))); refs.pages.forEach(pg => pg.traverse(o => carriers.add(o)));
+    const shown = o => { for (let n = o; n; n = n.parent) if (!n.visible) return false; return true; };
+    const runs = [["attachment", "apiq"], ["complex", "apiq"], ["complex", "frontier"], ["routine", "apiq"]];
+    const scenes = ["send", "scan", "gauge", "route", "model", "return"], hits = new Map(), box = new THREE.Box3(), pt = new THREE.Vector3();
+    const samples = [];
+    for (const [pid, pol] of runs) {
+      const prompt = K.promptById(pid), decision = K.decide(prompt, { external: pol });
+      for (const sceneId of scenes) for (let t = 0; t <= 1.0001; t += step) {
+        pose({ sceneId, t, prompt, decision, rules: [], callouts: [] }, 0); world.updateMatrixWorld(true);
+        const carrier = refs.packet.visible ? refs.packet : refs.answer.visible ? refs.answer : null;
+        if (!carrier) continue;
+        samples.length = 0;
+        carrier.traverse(o => {
+          if (!o.isMesh || !shown(o) || o.geometry.type !== "PlaneGeometry") return;
+          const { width: w, height: h } = o.geometry.parameters;
+          for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) samples.push(pt.set((i / 4 - 0.5) * w, (j / 4 - 0.5) * h, 0).applyMatrix4(o.matrixWorld).clone());
+        });
+        world.traverse(o => {
+          if (!o.isMesh || carriers.has(o) || o.userData.noCollide || !shown(o)) return;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          if (mats.every(m => m.transparent && m.opacity < 0.05)) return;
+          box.setFromObject(o).expandByScalar(-0.004);
+          if (box.isEmpty() || !samples.some(p => box.containsPoint(p))) return;
+          const c = box.getCenter(new THREE.Vector3()), id = `${o.geometry.type}:${key(mats[0].color)}@${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)}`;
+          const hk = sceneId + "|" + id, prev = hits.get(hk);
+          hits.set(hk, prev ? { ...prev, t1: +t.toFixed(2), runs: prev.runs.add(pid + "/" + pol) } : { scene: sceneId, mesh: id, t0: +t.toFixed(2), t1: +t.toFixed(2), runs: new Set([pid + "/" + pol]) });
+        });
+      }
+    }
+    lastSig = "";
+    const list = [...hits.values()].map(h => ({ ...h, runs: [...h.runs].join(" ") }));
+    return { ok: list.length === 0, count: list.length, hits: list };
+  }
+
+  return { init, frame, resetView, debugCollisions, info: () => ({ ...info }) };
 })();
