@@ -319,7 +319,7 @@ window.AppCore = (() => {
         if (p && P.calloutScenes && P.calloutScenes.includes(ds.scene) && wi.callouts < 1) failures.push("world-callouts");
       }
       if (H.probe) H.probe(c, failures, p, d, wi, done);
-      if (document.body.textContent.includes("—")) failures.push("em-dash");
+      if (document.body.textContent.includes("\u2014")) failures.push("em-dash");
       return { ok: failures.length === 0, failures, scene: ds.scene, phase: ds.phase, prompt: ds.prompt, packet: ds.packet, world: wi };
     }
     async function selfTest() {

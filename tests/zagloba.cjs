@@ -60,7 +60,7 @@ test("scenes and documents are consistent", () => {
 });
 
 test("no em-dashes in user-facing data", () => {
-  assert.ok(!fs.readFileSync(path.join(__dirname, "..", "zagloba-data.js"), "utf8").includes("—"));
+  assert.ok(!fs.readFileSync(path.join(__dirname, "..", "zagloba-data.js"), "utf8").includes("\u2014"));
 });
 
 console.log(`\n${passed} passed`);
