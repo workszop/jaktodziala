@@ -1,0 +1,30 @@
+# ─── Working artifacts: never committed ───
+plans/
+mockups/
+superpowers/
+.superpowers/
+docs/superpowers/
+specs/
+scratch/
+shots/
+screenshots/
+progress.md
+review*.md
+*.plan.md
+*.spec.md
+*.draft.*
+.readme
+notes*.md
+
+# another agent's separate working copy
+klara-journey/
+
+# ─── Tooling / OS ───
+node_modules/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
