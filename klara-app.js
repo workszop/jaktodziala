@@ -128,7 +128,7 @@
           ...(att ? [{ text: t > 0.62 ? "załącznik: " + attItems.length + " fragmenty chronione" : "załącznik: analiza…", state: t > 0.62 ? "flag" : "muted" }] : []),
           ...(t > 0.78 ? [prot.length ? { text: "pakiet oznaczony: zakaz wyjścia poza organizację", state: "flag" } : { text: "pakiet może wyjść poza organizację, jeśli wymaga tego zadanie", state: "ok" }] : [])] });
     }
-    if (id === "gauge" && t > 0.35) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "klara", kicker: "Krok 2 · Miernik złożoności",
+    if (id === "gauge" && t > 0.35) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "accent", kicker: "Krok 2 · Miernik złożoności",
       title: t > 0.85 ? "Ocena: " + K.COMPLEXITY[d.level].label : "Ocena złożoności…",
       lines: [["routine", "proste i rutynowe → model lokalny"], ["standard", "standardowe → model lokalny"], ["high", "najbardziej wymagające → model zewnętrzny, jeśli pozwala polityka"]]
         .map(([lv, text]) => ({ text, state: t > 0.85 && d.level === lv ? "on" : "muted" })) });
