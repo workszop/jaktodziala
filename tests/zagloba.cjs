@@ -12,11 +12,11 @@ test("permission invariant: a document the user cannot read is never cited", () 
   }
 });
 
-test("restricted question: the board document is skipped without access and cited with it", () => {
-  const p = Z.promptById("restricted");
+test("procedure question: the board document is skipped without access and cited with it", () => {
+  const p = Z.promptById("procedure");
   const without = Z.decide(p, { boardAccess: false }), withAccess = Z.decide(p, { boardAccess: true });
-  assert.deepStrictEqual([...without.skipped], ["budzet"]);
-  assert.ok(!without.citations.includes("budzet") && withAccess.citations.includes("budzet"));
+  assert.deepStrictEqual([...without.skipped], ["limity"]);
+  assert.ok(!without.citations.includes("limity") && withAccess.citations.includes("limity"));
   assert.strictEqual(withAccess.skipped.length, 0);
 });
 

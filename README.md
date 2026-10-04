@@ -13,7 +13,7 @@ Open `index.html` (the home page), `klara.html` or `zagloba.html` directly, or s
 **URL parameters** (both apps):
 
 - `?scene=<id>` opens a scene, shown finished and step by step; scenes after the chat need a `prompt`. Add `&play=1` to play it from its start instead.
-- `?prompt=<id>` – Klara: `sensitive|routine|complex|attachment`; Zagłoba: `procedure|restricted|nodata|fresh`.
+- `?prompt=<id>` – Klara: `sensitive|routine|complex|attachment`; Zagłoba: `procedure|nodata|fresh`.
 - The admin setting – Klara: `?policy=apiq|frontier|off`; Zagłoba: `?access=board` (access to the board folder granted). A restart (`R` / *Od nowa* / *Zacznij od nowa*) and the self-test start from it again; a deep-linked run (`?scene=…&prompt=…`) keeps the setting it opened with when the setting is changed later (the change applies to the next run).
 - `?auto=0` (start step by step) · `?auto=1` (Auto even with a deep link) · `?speed=0.25–4` (animation speed, clamped) · `?selftest=1` (starts step by step and runs the self-test once the renderer is ready; the result lands in `data-test`).
 
@@ -45,7 +45,7 @@ The journey of a question through **Zagłoba – inteligentny asystent wiedzy** 
 | # | Scene | What happens |
 |---|---|---|
 | 01 | Pulpit i logowanie | Login with an organisation account – the user's role and access rights come with it. |
-| 02 | Pytanie | 4 questions: procedure · restricted access · no coverage · a document changed yesterday. |
+| 02 | Pytanie | 3 questions: a procedure (one matching document sits in the board folder) · no coverage · a document changed yesterday. |
 | 03 | Wysyłka | The question rides the cable to the server; Zagłoba can run fully on-premise. |
 | 04 | Wyszukiwanie | Hybrid search over the knowledge index (shelves synced with SharePoint, OneDrive, Amazon S3): keyword highlights on the sheet, beams to the candidate documents. For question 4 the changed document first arrives through the SharePoint sync pipe. |
 | 05 | Uprawnienia | A badge gate checks every candidate; a document from the board folder is stopped, locked and dropped into the "skipped" tray. |

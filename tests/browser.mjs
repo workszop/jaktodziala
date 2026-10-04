@@ -224,10 +224,10 @@ try {
   await z.goto(ROOT_URL + "zagloba.html?auto=0&speed=4"); await ready(z);
   check("?auto=0 starts step by step", (await data(z)).auto === "false");
   // the page opens at the idle start, step by step, where the playthrough begins by pressing Start
-  const zseen = await playthrough(z, "2", "Zagłoba ");
-  check("Zagłoba playthrough (restricted question) reaches the summary", zseen.at(-1) === "final", zseen.join(">"));
+  const zseen = await playthrough(z, "1", "Zagłoba ");
+  check("Zagłoba playthrough (procedure question) reaches the summary", zseen.at(-1) === "final", zseen.join(">"));
   const zrun = await z.evaluate(() => App.state.runs[0]);
-  check("Zagłoba: board document skipped and never cited", zrun && zrun.skipped.includes("budzet") && !zrun.citations.includes("budzet"));
+  check("Zagłoba: board document skipped and never cited", zrun && zrun.skipped.includes("limity") && !zrun.citations.includes("limity"));
   const zc = await z.evaluate(() => ZaglobaWorld.debugCollisions());
   check("Zagłoba: sheet never passes through scene geometry", zc.ok, (zc.hits || []).slice(0, 3).map(h => h.scene + "@" + h.t0 + " " + h.mesh).join(" | "));
   // the access setting resolves values through its declared options: "false" is not access, junk is ignored
@@ -249,7 +249,7 @@ try {
   check("Zagłoba self-test: questions × access × scenes", zt2.ok, zt2.failures.slice(0, 3).join(" | "));
   check("Zagłoba self-test from an ?access=board link passes and ends on it", zt2.ok && (await data(z)).boardAccess === "true" && (await data(z)).test === "pass", zt2.failures.slice(0, 3).join(" | "));
   const zm = await open({ viewport: { width: 390, height: 844 } });
-  await zm.goto(ROOT_URL + "zagloba.html" + "?scene=admin&prompt=restricted"); await ready(zm);
+  await zm.goto(ROOT_URL + "zagloba.html" + "?scene=admin&prompt=procedure"); await ready(zm);
   check("Zagłoba: no horizontal overflow at 390px", await noOverflow(zm));
   }
   lap("");

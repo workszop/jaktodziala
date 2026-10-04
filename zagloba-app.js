@@ -125,7 +125,7 @@
         log: Z.SOURCE_IDS.map(sid => [Z.SOURCES[sid].title + " · " + Object.values(Z.DOCS).filter(doc => doc.source === sid).length + " dokumenty (demo)", sid === "sharepoint" ? "zmiana wykryta wczoraj" : "aktualne"]),
         settingsTitle: "Uprawnienia: " + Z.USER.name + " · folder Zarządu",
         rule: ["Role i poziomy dostępu są zachowane", "Odpowiedzi powstają wyłącznie z dokumentów, do których użytkownik ma uprawnienia."],
-        rerun: ["Zadaj ponownie pytanie o projekt", "restricted"]
+        rerun: ["Zadaj ponownie pytanie o procedurę", "procedure"]
       };
     },
 
@@ -167,13 +167,13 @@
       finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Jedno okno pytań dla pracownika. Odpowiedzi tylko z dokumentów, do których ma uprawnienia – ze wskazaniem źródeł.",
       tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", otherPrompt: "Inne pytanie", adminJump: "Zmień uprawnienia w panelu", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
     },
-    autoOrder: ["procedure", "restricted", "nodata", "fresh"],
+    autoOrder: ["procedure", "nodata", "fresh"],
     dwell: { search: 4.5, access: 4.5, rank: 4 },
     calloutScenes: ["search", "access", "rank", "model"],
     // the admin panel's one setting: the user's access to the board folder (?access=board, App.setAccess, data-board-access)
     setting: { key: "boardAccess", param: "access", attr: "boardAccess", api: "setAccess", label: "Dostęp użytkownika do folderu Zarządu",
       options: [{ value: false, tag: "", label: "Brak dostępu", sub: "folder Zarządu niedostępny dla " + Z.USER.name },
-        { value: true, param: "board", tag: "/zarząd", label: "Dostęp nadany", sub: "np. po delegowaniu do projektu inwestycji" }] },
+        { value: true, param: "board", tag: "/zarząd", label: "Dostęp nadany", sub: "np. po delegowaniu do zespołu reklamacji" }] },
     adminFrom: ["access", "rank"],
     nextLabels: { chat: "Zapytaj Zagłobę" },
     flowNodes: [

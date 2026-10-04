@@ -22,9 +22,7 @@
     reklamacje: { title: "Procedura reklamacji dostaw.pdf", source: "sharepoint", access: "all" },
     obieg: { title: "Instrukcja obiegu dokumentów.docx", source: "sharepoint", access: "all" },
     cennik: { title: "Cennik kartonów klapowych 2026.xlsx", source: "onedrive", access: "all" },
-    notatka: { title: "Notatka ze spotkania projektowego.docx", source: "onedrive", access: "all" },
-    harmonogram: { title: "Harmonogram wdrożenia linii.xlsx", source: "onedrive", access: "all" },
-    budzet: { title: "Budżet inwestycji – Zarząd.xlsx", source: "sharepoint", access: "board" },
+    limity: { title: "Limity akceptacji reklamacji – Zarząd.pdf", source: "sharepoint", access: "board" },
     delegacje: { title: "Regulamin delegacji 2026.pdf", source: "s3", access: "all" },
     zdalna: { title: "Regulamin pracy zdalnej.docx", source: "sharepoint", access: "all", fresh: true }
   };
@@ -34,27 +32,21 @@
     {
       id: "procedure", key: "1", label: "Pytanie o procedurę",
       text: "Jak zarejestrować reklamację dostawy od klienta hurtowego?",
-      candidates: [["reklamacje", 0.92, 0.88], ["obieg", 0.81, 0.62], ["cennik", 0.34, 0.41]],
+      // one candidate sits in the board folder: skipped without access, cited with it
+      candidates: [["reklamacje", 0.92, 0.88], ["limity", 0.86, 0.74], ["obieg", 0.81, 0.62], ["cennik", 0.34, 0.41]],
       covered: true,
-      answer: "Reklamację rejestruje się w systemie zamówień w ciągu 2 dni roboczych od zgłoszenia [1]. Dokumenty przekazuje się do działu jakości, który odpowiada w terminie 14 dni [2]."
+      answer: "Reklamację rejestruje się w systemie zamówień w ciągu 2 dni roboczych od zgłoszenia [1]. Dokumenty przekazuje się do działu jakości, który odpowiada w terminie 14 dni [2].",
+      answerWithBoard: "Reklamację rejestruje się w systemie zamówień w ciągu 2 dni roboczych od zgłoszenia [1]. Reklamacje o wartości powyżej 50 tys. zł zatwierdza Zarząd [2]. Dokumenty przekazuje się do działu jakości, który odpowiada w terminie 14 dni [3]."
     },
     {
-      id: "restricted", key: "2", label: "Ograniczony dostęp",
-      text: "Podsumuj ustalenia z dokumentacji projektu nowej linii produkcyjnej.",
-      candidates: [["notatka", 0.89, 0.8], ["budzet", 0.86, 0.74], ["harmonogram", 0.78, 0.71]],
-      covered: true,
-      answer: "Ustalenia: start pilotażu w II kwartale 2027 r. [1]; odpowiedzialny zespół wdrożeniowy, kamienie milowe co 6 tygodni [2].",
-      answerWithBoard: "Ustalenia: start pilotażu w II kwartale 2027 r. [1]; zatwierdzony budżet inwestycji [2]; odpowiedzialny zespół wdrożeniowy, kamienie milowe co 6 tygodni [3]."
-    },
-    {
-      id: "nodata", key: "3", label: "Brak pokrycia w bazie",
+      id: "nodata", key: "2", label: "Brak pokrycia w bazie",
       text: "Jakie zasady rozliczania delegacji zagranicznych będą obowiązywać w przyszłym roku?",
       candidates: [["delegacje", 0.71, 0.66], ["cennik", 0.22, 0.18]],
       covered: false, redirect: "dział finansowy",
       answer: "W bazie wiedzy nie ma informacji o zasadach na przyszły rok. Obowiązujące dziś zasady opisuje [1]. Właściwym źródłem informacji o zmianach jest dział finansowy."
     },
     {
-      id: "fresh", key: "4", label: "Nowy dokument",
+      id: "fresh", key: "3", label: "Nowy dokument",
       text: "Co zmieniło się w regulaminie pracy zdalnej od października?",
       candidates: [["zdalna", 0.94, 0.9], ["obieg", 0.3, 0.25]],
       covered: true,
