@@ -1,11 +1,7 @@
 // Deterministic checks for Zagłoba's retrieval decision and data. Run: node tests/zagloba.cjs
 "use strict";
-const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
-const ctx = { globalThis: {} }; ctx.globalThis = ctx;
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "zagloba-data.js"), "utf8"), ctx);
-const Z = ctx.ZaglobaData;
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log("ok  " + name); };
+const { assert, load, test, testNoEmDashes, finish } = require("./harness.cjs");
+const Z = load("zagloba-data.js", "ZaglobaData");
 const SETTINGS = [{ boardAccess: false }, { boardAccess: true }];
 
 test("permission invariant: a document the user cannot read is never cited", () => {
@@ -59,8 +55,5 @@ test("scenes and documents are consistent", () => {
   assert.strictEqual(Z.packetAt("model"), "local"); assert.strictEqual(Z.packetAt("nope"), "none");
 });
 
-test("no em-dashes in user-facing data", () => {
-  assert.ok(!fs.readFileSync(path.join(__dirname, "..", "zagloba-data.js"), "utf8").includes("\u2014"));
-});
-
-console.log(`\n${passed} passed`);
+testNoEmDashes();
+finish();

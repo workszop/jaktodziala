@@ -1,11 +1,7 @@
 // Deterministic checks for the routing decision and scene data. Run: node tests/route.cjs
 "use strict";
-const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
-const ctx = { globalThis: {} }; ctx.globalThis = ctx;
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "klara-data.js"), "utf8"), ctx);
-const K = ctx.KlaraData;
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log("ok  " + name); };
+const { assert, load, test, testNoEmDashes, finish } = require("./harness.cjs");
+const K = load("klara-data.js", "KlaraData");
 
 test("every prompt × policy yields a known target", () => {
   for (const p of K.PROMPTS) for (const o of K.POLICY_OPTIONS) {
@@ -28,6 +24,12 @@ test("privacy invariant: protected data is never routed externally, under any po
 
 test("routine and standard tasks stay local; complex follows policy", () => {
   assert.strictEqual(K.decide(K.promptById("routine"), { external: "frontier" }).target, "local");
+  // "standard" without protected data (the only standard prompt also carries protected data, which would keep it local anyway)
+  const standard = { ...K.promptById("complex"), complexity: "standard" };
+  for (const o of K.POLICY_OPTIONS) {
+    const d = K.decide(standard, { external: o.id });
+    assert.strictEqual(d.level, "standard"); assert.strictEqual(d.protectedCount, 0); assert.strictEqual(d.target, "local", o.id);
+  }
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "apiq" }).target, "apiq");
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "frontier" }).target, "frontier");
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "off" }).target, "local");
@@ -72,9 +74,5 @@ test("scenes: unique ids, positive durations, packet locations resolvable", () =
   assert.strictEqual(K.packetAt("nope", d), "none");
 });
 
-test("no em-dashes in user-facing data", () => {
-  const src = fs.readFileSync(path.join(__dirname, "..", "klara-data.js"), "utf8");
-  assert.ok(!src.includes("\u2014"), "em-dash found");
-});
-
-console.log(`\n${passed} passed`);
+testNoEmDashes();
+finish();

@@ -25,7 +25,9 @@ const check = (name, ok, detail = "") => { console.log((ok ? "ok  " : "FAIL") + 
 const watch = p => { p.on("console", m => { if (m.type() === "error") errors.push(m.text()); }); p.on("pageerror", e => errors.push(e.message)); return p; };
 const data = p => p.evaluate(() => ({ ...document.getElementById("app").dataset }));
 const ready = (p, r = "webgl") => p.waitForFunction(want => document.getElementById("app").dataset.renderer === want, r, { timeout: 25000 });
-const done = p => p.waitForFunction(() => document.getElementById("app").dataset.phase === "done", null, { timeout: 45000 });
+// a condition that never comes true is a named failure (false), not a timeout exception that aborts the run
+const until = (p, fn, ms = 10000, arg) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
+const done = p => until(p, () => document.getElementById("app").dataset.phase === "done", 45000);
 const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 // Keyboard playthrough to the summary: `key` picks the prompt in the chat; after every scene the world's packet must match
 // the DOM contract and the probe must pass. Returns the scenes seen.
@@ -34,12 +36,12 @@ async function playthrough(p, key, prefix = "") {
   for (let i = 0; i < 14; i++) {
     // the contract updates on the key event, the world publishes its packet on its next frame – after the collision replay
     // that first software-WebGL frame can take seconds under load, so allow a generous catch-up before comparing
-    await p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.packet === "moving" || s.worldPacket === s.packet; }, null, { timeout: 10000 }).catch(() => {});
+    await until(p, () => { const s = document.getElementById("app").dataset; return s.packet === "moving" || s.worldPacket === s.packet; });
     const d = await data(p); seen.push(d.scene);
     if (d.packet !== "moving" && d.worldPacket !== d.packet) check(prefix + "world packet at " + d.scene, false, d.worldPacket + " ≠ " + d.packet);
     if (d.scene === "final") break;
     if (d.scene === "chat") { await p.keyboard.press(key); await p.keyboard.press("Enter"); } else await p.keyboard.press("ArrowRight");
-    await done(p);
+    if (!await done(p)) { check(prefix + "scene finishes: " + (await data(p)).scene, false); break; }
     const pr = await p.evaluate(() => App.probe()); if (!pr.ok) check(prefix + "probe at " + pr.scene, false, pr.failures.join(","));
   }
   return seen;
@@ -70,25 +72,23 @@ try {
   // default mode: Auto, advancing without input; dragging the 3D view keeps it; the switch goes to step by step
   check("starts in Auto mode", (await data(page)).auto === "true");
   // every simulation starts idle: the robot stands in the room until Start, and Auto does not leave that on its own
-  const idleRobot = p => p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.phase === "idle" && s.worldRobot === "waiting"; }, null, { timeout: 10000 }).then(() => true, () => false);
+  const idleRobot = p => until(p, () => { const s = document.getElementById("app").dataset; return s.phase === "idle" && s.worldRobot === "waiting"; });
   check("starts idle with the robot standing in the room", await idleRobot(page) && await page.isVisible("#btnStart"));
-  await page.waitForTimeout(3000);
-  check("Auto waits for Start", (await data(page)).phase === "idle" && (await page.evaluate(() => App.probe())).ok);
+  // the Auto timer (dwell) only runs once a scene is done: while idle it stays 0 however long the page waits,
+  // so ~1.5 s and at least 20 frames (each one an Auto tick) prove it without outwaiting DWELL.login
+  await page.evaluate(() => new Promise(r => { const t0 = performance.now(); let n = 0; const f = () => (++n >= 20 && performance.now() - t0 >= 1500 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }));
+  check("Auto waits for Start", (await data(page)).phase === "idle" && await page.evaluate(() => App.state.dwell === 0 && App.probe().ok));
   await page.click("#btnStart");
-  check("Start: robot walks to the computer, Auto stays on", await page.waitForFunction(() => document.getElementById("app").dataset.worldRobot === "walking", null, { timeout: 10000 }).then(() => true, () => false)
+  check("Start: robot walks to the computer, Auto stays on", await until(page, () => document.getElementById("app").dataset.worldRobot === "walking")
     && (await data(page)).auto === "true" && !(await page.isVisible("#btnStart")));
-  await page.waitForFunction(() => document.getElementById("app").dataset.scene !== "login", null, { timeout: 45000 });
-  check("Auto advances past the first scene on its own", true);
+  check("Auto advances past the first scene on its own", await until(page, () => document.getElementById("app").dataset.scene !== "login", 45000));
   const box = await page.locator(".world-canvas").boundingBox();
   if (box) { await page.mouse.move(box.x + 200, box.y + 200); await page.mouse.down(); await page.mouse.move(box.x + 320, box.y + 210); await page.mouse.up(); }
-  check("rotating the 3D view keeps Auto", (await data(page)).auto === "true");
+  check("rotating the 3D view keeps Auto", !!box && (await data(page)).auto === "true", box ? "" : "no 3D canvas");
   await page.click("#btnStep");
   check("switch to Krok po kroku", (await data(page)).auto === "false" && await page.getAttribute("#btnStep", "aria-pressed") === "true");
   await page.click("#btnAuto");
   check("switch back to Auto", (await data(page)).auto === "true");
-  const stepPage = watch(await browser.newPage({ viewport: { width: 1280, height: 800 } }));
-  await stepPage.goto(BASE + "?auto=0"); await ready(stepPage);
-  check("?auto=0 starts step by step", (await data(stepPage)).auto === "false"); await stepPage.close();
   const st = await page.evaluate(() => App.selfTest());
   check("self-test: prompts × policies × scenes", st.ok, st.failures.slice(0, 3).join(" | "));
   const col = await page.evaluate(() => KlaraWorld.debugCollisions());
@@ -114,7 +114,7 @@ try {
   await f.goto(BASE + "?scene=route&prompt=sensitive&policy=frontier"); await ready(f, "fallback");
   const fp = await f.evaluate(() => App.probe());
   check("fallback probe (privacy + flow contract)", fp.ok, fp.failures.join(","));
-  check("fallback blocks external routes", await f.evaluate(() => ["apiq", "frontier"].every(r => document.querySelector(`#flowBig [data-node="${r}"]`).dataset.state === "blocked")));
+  check("fallback blocks external routes", await f.evaluate(() => ["apiq", "frontier"].every(r => document.querySelector(`#flowBig [data-node="${r}"]`)?.dataset.state === "blocked")));
 
   // 4b) shell regressions: the idle stepper, keyboard focus, deep-linked runs, reduced motion, the setting API
   const g = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
@@ -151,11 +151,12 @@ try {
   // 5) Zagłoba: same shell and engine, its own invariants (permissions, citations, abstention)
   const z = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
   await z.goto(ROOT_URL + "zagloba.html" + "?auto=0"); await ready(z);
+  check("?auto=0 starts step by step", (await data(z)).auto === "false");
   const zt = await z.evaluate(() => App.selfTest());
   check("Zagłoba self-test: questions × access × scenes", zt.ok, zt.failures.slice(0, 3).join(" | "));
   const zc = await z.evaluate(() => ZaglobaWorld.debugCollisions());
   check("Zagłoba: sheet never passes through scene geometry", zc.ok, (zc.hits || []).slice(0, 3).map(h => h.scene + "@" + h.t0 + " " + h.mesh).join(" | "));
-  await z.evaluate(() => App.restart()); await z.keyboard.press("ArrowRight"); await z.waitForTimeout(100); await done(z);
+  // the self-test ends with a restart (idle start, step by step), where the playthrough begins by pressing Start
   const zseen = await playthrough(z, "2", "Zagłoba ");
   check("Zagłoba playthrough (restricted question) reaches the summary", zseen.at(-1) === "final", zseen.join(">"));
   const zrun = await z.evaluate(() => App.state.runs[0]);
