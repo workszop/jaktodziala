@@ -32,8 +32,9 @@ const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <=
 async function playthrough(p, key, prefix = "") {
   const seen = [];
   for (let i = 0; i < 14; i++) {
-    // the contract updates on the key event, the world publishes its packet on the next frame: give it a moment to catch up
-    await p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.packet === "moving" || s.worldPacket === s.packet; }, null, { timeout: 2000 }).catch(() => {});
+    // the contract updates on the key event, the world publishes its packet on its next frame – after the collision replay
+    // that first software-WebGL frame can take seconds under load, so allow a generous catch-up before comparing
+    await p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.packet === "moving" || s.worldPacket === s.packet; }, null, { timeout: 10000 }).catch(() => {});
     const d = await data(p); seen.push(d.scene);
     if (d.packet !== "moving" && d.worldPacket !== d.packet) check(prefix + "world packet at " + d.scene, false, d.worldPacket + " ≠ " + d.packet);
     if (d.scene === "final") break;
@@ -90,6 +91,8 @@ try {
   const seen = await playthrough(page, "1");
   check("playthrough reaches the summary", seen.at(-1) === "final", seen.join(">"));
   check("one run recorded, routed locally", (await data(page)).runs === "1" && (await page.evaluate(() => App.state.runs[0].target)) === "local");
+  const st2 = await page.evaluate(() => App.selfTest());
+  check("self-test passes after the user's own runs", st2.ok, st2.failures.slice(0, 3).join(" | "));
 
   // 3) phone width
   const m = watch(await browser.newPage({ viewport: { width: 390, height: 844 } }));

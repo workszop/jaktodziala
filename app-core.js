@@ -368,7 +368,8 @@ window.AppCore = (() => {
     }
     async function selfTest() {
       const results = [], wait = () => new Promise(r => setTimeout(r, 30));
-      const saved = { auto: state.auto }; setAuto(false);
+      // start from the clean state the test ends in: earlier runs (or one being recorded at "return") would skew the run-log count
+      const saved = { auto: state.auto }; setAuto(false); restart();
       const runs = K.PROMPTS.flatMap(pr => SET.options.map(o => ({ promptId: pr.id, settings: { [SET.key]: o.value }, label: pr.id + (o.tag ?? "/" + o.value) })));
       for (const run of runs) {
         state.settings = { ...defaultSettings(), ...run.settings }; startRun(run.promptId);
