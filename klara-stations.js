@@ -6,7 +6,9 @@ window.KlaraStations = {
     sceneOrder: ["login", "chat", "send", "scan", "gauge", "route", "model", "return", "admin", "final"],
     openScene: "scan",
     travelScenes: ["scan", "gauge", "route", "model"],
-    colorKeys: ["providerA", "providerB", "providerC", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked", "xrayShell", "xrayBg", "xrayLine"],
+    colorKeys: ["providerA", "providerB", "providerC", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked", "xrayShell", "xrayBg", "xrayLine", "sofa", "counter"],
+    // open-space office: a high strip of windows, a rug under the lounge
+    office: { windows: { count: 4, w: 1.4, h: 0.36, y: 0.62 }, rug: [4.15, 4.6, 2.3, 1.8] },
     ports: [10.9, 11.5],
     clouds: [
       { key: "apiq", pos: [9.3, 3.1, -2.7], ring: "brand", emblem: "q" },
@@ -19,7 +21,7 @@ window.KlaraStations = {
       gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 }
     },
     labels: [
-      { id: "monitor", text: "Podgląd skanu", color: "scan", pos: [9.18, 2.08, 1.66], scenes: ["scan", "gauge"] },
+      { id: "monitor", text: "Podgląd skanu", color: "scan", pos: [9.18, 2.25, 1.74], scenes: ["scan", "gauge"] },
       { id: "scan", text: "Skaner rentgenowy", color: "scan", pos: [9.2, 1.06, 2.8], scenes: ["scan"] },
       { id: "gauge", text: "Miernik złożoności", color: "accent", pos: [10.0, 1.18, 2.25], scenes: ["gauge"] },
       { id: "switch", text: "Zwrotnica", color: "accent", pos: [10.9, 0.8, 2.85], scenes: ["route"] },
@@ -31,7 +33,7 @@ window.KlaraStations = {
     ],
     // Callout anchors share ids with labels: an active callout replaces the plain label.
     anchors: {
-      monitor: [8.62, 1.6, 1.9], scan: [9.2, 0.9, 3.3], gauge: [10.27, 0.76, 2.34], switch: [10.9, 0.4, 2.8],
+      monitor: [8.6, 1.74, 1.94], scan: [9.2, 0.9, 3.3], gauge: [10.27, 0.76, 2.34], switch: [10.9, 0.4, 2.8],
       policy: [10.75, 1.82, 1.72], local: [12.25, 1.1, 2.95], gate: [11.25, 0.7, 0.06], apiq: [9.3, 3.5, -2.7], frontier: [13.2, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server i modele zewnętrzne. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
@@ -73,9 +75,7 @@ window.KlaraStations = {
     }
     // Preview monitor above the back panel: the message on the left, attachments on the right.
     function buildXrayMonitor() {
-      const W = 1.3, H = 0.775, g = group(SCAN[0] - 0.02, FLOOR + 1.12, 1.66); g.rotation.y = 0.32;
-      box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
-      for (const dx of [-0.45, 0.45]) box(dx, 0.02, 0.05, 0.05, 0.14, "metal", -0.14, g);
+      const W = 1.3, H = 0.775, g = k.rackMonitor(SCAN[0] - 0.02, W, H);
       refs.xrayCanvas = document.createElement("canvas"); refs.xrayCanvas.width = 1024; refs.xrayCanvas.height = 610;
       refs.xrayTex = new THREE.CanvasTexture(refs.xrayCanvas); refs.xrayTex.colorSpace = THREE.SRGBColorSpace; refs.xrayTex.anisotropy = 4;
       const screen = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: refs.xrayTex, toneMapped: false }));
@@ -189,6 +189,28 @@ window.KlaraStations = {
         const meshes = segs[key].map(([a, b]) => { const st = strip(a, b, 0.05, 0.012, m, FLOOR + 0.161); st.castShadow = false; st.visible = false; return st; });
         refs.tracks[key] = { m, meshes };
       }
+    }
+    // ─── Office: open space – a desk pod, a coffee point, a whiteboard and a lounge corner ───
+    function buildOffice() {
+      for (const x of [4.4, 5.7]) { k.deskAt(x, 1.55, undefined, Math.PI); k.deskAt(x, 2.21); k.chair(x, 0.92, 0); k.chair(x, 2.86, Math.PI); }
+      // coffee point along the back wall
+      box(1.1, 0.36, 1.5, 0.45, 0.7, "counter", 0, undefined, 0.02); box(1.1, 0.36, 1.56, 0.5, 0.04, "wood", 0.7, undefined, 0.02);
+      for (let i = 0; i < 3; i++) box(0.6 + i * 0.5, 0.585, 0.44, 0.01, 0.6, "edge", 0.05);
+      box(0.62, 0.3, 0.26, 0.26, 0.36, "ink", 0.74, undefined, 0.03); box(0.62, 0.44, 0.1, 0.02, 0.05, "accent", 0.9);
+      for (const [x, c] of [[0.98, "paper"], [1.12, "accent"], [1.26, "paper"]]) cylinder(x, 0.42, 0.035, 0.08, c, 0.74);
+      // whiteboard on the left wall
+      box(0.14, 1.45, 0.03, 1.3, 0.62, "metal", 0.36); box(0.16, 1.45, 0.02, 1.22, 0.54, "paper", 0.4);
+      for (const [dz, y, w, c] of [[-0.3, 0.82, 0.4, "accent"], [-0.25, 0.7, 0.5, "admin"], [0.25, 0.78, 0.36, "ink"], [0.2, 0.62, 0.46, "accent"], [-0.2, 0.52, 0.3, "ink"]]) box(0.175, 1.45 + dz, 0.01, w, 0.025, c, y);
+      // lounge corner in front of the pod: sofa facing the room, an armchair and a round coffee table
+      const L = [3.45, 4.6];
+      box(L[0], L[1], 0.6, 1.3, 0.2, "sofa", 0.1, undefined, 0.05); box(L[0] - 0.24, L[1], 0.14, 1.3, 0.56, "sofa", 0.06, undefined, 0.04);
+      for (const dz of [-0.63, 0.63]) box(L[0], L[1] + dz, 0.6, 0.12, 0.4, "sofa", 0.06, undefined, 0.04);
+      for (const dz of [-0.3, 0.3]) box(L[0] + 0.04, L[1] + dz, 0.44, 0.5, 0.08, "sofa", 0.3, undefined, 0.04);
+      box(4.85, L[1], 0.56, 0.6, 0.2, "sofa", 0.1, undefined, 0.05); box(5.07, L[1], 0.14, 0.6, 0.5, "sofa", 0.06, undefined, 0.04);
+      for (const dz of [-0.27, 0.27]) box(4.85, L[1] + dz, 0.56, 0.1, 0.36, "sofa", 0.06, undefined, 0.04);
+      cylinder(4.15, L[1], 0.3, 0.04, "wood", 0.32, undefined, 0.3, 28); cylinder(4.15, L[1], 0.03, 0.32, "metal");
+      cylinder(4.08, L[1] - 0.06, 0.035, 0.07, "accent", 0.36); box(4.22, L[1] + 0.08, 0.2, 0.14, 0.012, "paper", 0.36);
+      k.plant(0.42, 2.6, 1.1); k.plant(7.1, 5.6, 1.15); k.plant(7.15, 3.4, 0.9); k.plant(7.1, 1.2, 0.8);
     }
     function build() {
       k.belt(8.475, 10.925);
@@ -349,7 +371,7 @@ window.KlaraStations = {
       });
     }
     return {
-      build, buildPaths, pose, shot, labelVisible, labelState, collisionRuns,
+      buildOffice, build, buildPaths, pose, shot, labelVisible, labelState, collisionRuns,
       sig: s => (s.decision ? s.decision.target + s.decision.states.apiq : ""),
       animating: s => s.sceneId === "model" || s.sceneId === "return"
     };

@@ -4,29 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0A1F2C">
-<meta name="description" content="Zagłoba od środka – interaktywna podróż pytania przez asystenta wiedzy: od pulpitu, przez wyszukiwanie w bazie wiedzy, kontrolę uprawnień i ocenę trafności, do odpowiedzi ze wskazaniem źródeł.">
+<meta name="description" content="Klara od środka – interaktywna podróż zapytania przez bezpieczny (i inteligentny) chat AI: od okna czatu, przez serwer organizacji i zwrotnicę modeli, z powrotem do użytkownika.">
 <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
-<title>Zagłoba od środka – jak działa inteligentny asystent wiedzy</title>
+<title>Klara od środka – jak działa bezpieczny (i inteligentny) chat AI</title>
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 <style>
-/* ─── Product tokens: Zagłoba (accent = Zagłoba sea green) ─── */
+/* ─── Product tokens: Klara (accent = Klara orange) ─── */
 :root{
-  --accent:#197d78;--accent-deep:#0f5a56;--accent-tint:#e8f5f2;--accent-mark:#c9ebe3;--ring:rgba(25,125,120,.22);
-  --world-accent:#1f9a92;--world-accentTint:#d9f2ee;
-  --world-srcA:#3b6fb6;--world-srcB:#5b8def;--world-srcC:#d08a2a;--world-lockRed:#d1334f;
-  --world-xrayBg:#0b2533;--world-xrayLine:#7fe3ff;--world-podium:#e8eef2;--world-tube:#bfe3ee;
-  /* office: warm knowledge office – oak floor, sage walls, sea-green rug and chairs */
-  --world-officeFloor:#ecdfc8;--world-wall:#d9e2d5;--world-rug:#cde6de;--world-wood:#a87c53;--world-upholstery:#2c6e69;--world-cabinet:#c7d3cc;--world-lampShade:#f6e7c1;
+  --accent:#c2410c;--accent-deep:#9a3412;--accent-tint:#fdf0e8;--accent-mark:#fde2cf;--ring:rgba(194,65,12,.22);
+  --world-accent:#e0560f;--world-accentTint:#fde7d8;
+  --world-providerA:#795a9c;--world-providerB:#4f46e5;--world-providerC:#197d78;
+  --world-gaugeLow:#3fb489;--world-gaugeMid:#f0b429;--world-gaugeHigh:#e0560f;--world-blocked:#b4234a;
+  --world-xrayShell:#d6dde2;--world-xrayBg:#0b2533;--world-xrayLine:#7fe3ff;
+  /* office: cool open space with a Klara-orange lounge */
+  --world-officeFloor:#eceff1;--world-rug:#f7ded0;--world-upholstery:#3d5468;--world-sofa:#c95f2e;--world-counter:#f4f6f7;
 }
-/* flow: sources feed the search; the journey snakes back to the answer */
-.flow{grid-template-columns:repeat(4,1fr)}
-.node[data-node="sources"]{grid-column:3;grid-row:1}
-.node[data-node="desk"]{grid-column:1;grid-row:2}.node[data-node="cable"]{grid-column:2;grid-row:2}
-.node[data-node="search"]{grid-column:3;grid-row:2}.node[data-node="access"]{grid-column:4;grid-row:2}
-.node[data-node="rank"]{grid-column:4;grid-row:3}.node[data-node="local"]{grid-column:3;grid-row:3}.node[data-node="answer"]{grid-column:2;grid-row:3}
-.schema .zone{grid-column:3/5;grid-row:2/4}
 </style>
 </head>
 <body>
@@ -35,8 +29,8 @@
     <div class="brand">
       <a class="home-link" href="index.html" title="Wszystkie podróże"><img src="assets/brand/quantica-logo-white.png" alt="Quantica Lab – wszystkie podróże"></a>
       <span class="divider" aria-hidden="true"></span>
-      <h1>Zagłoba od środka</h1>
-      <span class="label">inteligentny asystent wiedzy · interaktywna podróż pytania</span>
+      <h1>Klara od środka</h1>
+      <span class="label">bezpieczny (i inteligentny) chat AI · interaktywna podróż zapytania</span>
     </div>
     <div class="tools">
       <div class="modesw" id="modeSwitch" role="group" aria-label="Tryb odtwarzania (A przełącza)" title="Tryb odtwarzania (A)">
@@ -49,7 +43,7 @@
     </div>
   </header>
 
-  <nav class="steps" aria-label="Etapy podróży pytania"><ol id="steps"></ol></nav>
+  <nav class="steps" aria-label="Etapy podróży zapytania"><ol id="steps"></ol></nav>
 
   <main class="main">
     <section class="stage" id="stage" aria-label="Scena">
@@ -72,14 +66,15 @@
         <ul class="bullets" id="pBullets"></ul>
         <div class="side-actions" id="pActions"></div>
         <div class="box" id="inspector" hidden>
-          <h3>Pytanie i dokumenty</h3>
+          <h3>Zawartość pakietu</h3>
           <div class="packet-text" id="iText"></div>
-          <div class="docs" id="iDocs"></div>
+          <div class="att-box" id="iAtt" hidden></div>
           <ul class="checks" id="iChecks"></ul>
+          <div class="routes" id="iRoutes"></div>
           <p class="meta" id="iMeta"></p>
         </div>
         <div class="box">
-          <h3>Gdzie jest pytanie</h3>
+          <h3>Gdzie jest zapytanie</h3>
           <div class="flow" id="flow"></div>
         </div>
       </div>
@@ -95,14 +90,14 @@
     <div class="keys">
       <kbd>→ N Spacja</kbd><span>dalej (pierwsze naciśnięcie kończy animację etapu)</span>
       <kbd>←</kbd><span>wstecz</span>
-      <kbd>1 2 3 4</kbd><span>wybór pytania (2 – ograniczony dostęp, 3 – brak pokrycia, 4 – nowy dokument)</span>
-      <kbd>Enter</kbd><span>zadaj pytanie Zagłobie</span>
+      <kbd>1 2 3 4</kbd><span>wybór polecenia w oknie czatu (4 – z załącznikiem)</span>
+      <kbd>Enter</kbd><span>wyślij polecenie do Klary</span>
       <kbd>A</kbd><span>przełącz tryb: Auto (domyślny, pętla kioskowa) ↔ Krok po kroku; kliknięcie przycisku lub klawisz nawigacji przełącza na Krok po kroku</span>
       <kbd>R</kbd><span>od nowa</span>
       <kbd>F</kbd><span>pełny ekran</span>
       <kbd>Esc</kbd><span>zamknij okno</span>
     </div>
-    <p class="meta">Symulacja poglądowa na danych przykładowych (fikcyjne dokumenty, fragmenty, osoby i firma). Nie wywołuje rzeczywistych modeli ani systemów. Opis działania według strony produktu Zagłoba.</p>
+    <p class="meta">Symulacja poglądowa na danych przykładowych (fikcyjne osoby, numery i firma). Nie wywołuje rzeczywistych modeli. Opis działania według strony produktu Klara.</p>
     <div class="probe-out" id="probeOut"></div>
     <div class="dlg-actions">
       <button class="btn" id="btnProbe" type="button">Diagnostyka demo</button>
@@ -110,10 +105,10 @@
     </div>
   </dialog>
 </div>
-<script src="zagloba-data.js"></script>
+<script src="klara-data.js"></script>
 <script src="world-core.js"></script>
-<script src="zagloba-stations.js"></script>
+<script src="klara-stations.js"></script>
 <script src="app-core.js"></script>
-<script src="zagloba-app.js"></script>
+<script src="klara-app.js"></script>
 </body>
 </html>

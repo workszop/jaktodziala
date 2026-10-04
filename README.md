@@ -1,6 +1,6 @@
 # Klara od środka · Zagłoba od środka
 
-Two interactive 3D walkthroughs built on one shared engine: **Klara** (`index.html`) and **Zagłoba** (`zagloba.html`).
+Two interactive 3D walkthroughs built on one shared engine: **Klara** (`klara.html`) and **Zagłoba** (`zagloba.html`). The home page (`index.html`) lets the visitor pick one (keys `1`/`2`); the Quantica logo in each app leads back to it. Old `index.html?scene=…` deep links redirect to `klara.html`.
 
 ## Klara od środka
 
@@ -25,7 +25,7 @@ Inside the server, **explanation callouts** are anchored to the stations (X-ray 
 
 ## Run
 
-Open `index.html` directly, or serve the folder with `python3 -m http.server`. There is no build step. Three.js 0.180 loads from jsDelivr; without it (or without WebGL) the demo switches to a schematic view and keeps working.
+Open `index.html` (the home page) or `klara.html` directly, or serve the folder with `python3 -m http.server`. There is no build step. Three.js 0.180 loads from jsDelivr; without it (or without WebGL) the demo switches to a schematic view and keeps working.
 
 **Keys:** `→`/`N`/`Space` next (the first press finishes the current animation), `←` back, `1–4` pick a prompt, `Enter` send, `A` switches Auto ↔ Krok po kroku (the app **starts in Auto**, a kiosk-style loop; pressing a button or a navigation key switches to step by step, rotating the 3D view does not), `R` restart, `H` help, `F` fullscreen. In the 3D view: drag to rotate, scroll to zoom, double-click to reset.
 
@@ -52,12 +52,13 @@ Invariant: a document the user cannot read is never cited (`tests/zagloba.cjs` +
 
 ## Files
 
-- `world-core.js` – the shared 3D engine (office, robots, server shell, cable, sheet, clouds, GPU cabinet, labels, callouts, camera, collision probe).
+- `world-core.js` – the shared 3D engine (rooms, the employee's desk and admin console, robots, server shell, rack-top monitor mount, cable, sheet, clouds, GPU cabinet, labels, callouts, camera, collision probe). Each product furnishes its own office (`buildOffice`, `config.office` windows/rug, office colour tokens in its shell): Klara is a cool open space with a desk pod, coffee point and an orange lounge; Zagłoba a warm knowledge office with bookcases, a file cabinet and a reading table.
 - `app-core.js` + `app.css` – the shared app shell (state machine, stepper, panel, desktop and chat, Auto / Krok po kroku, DOM contract, probe, self-test).
 - `klara-stations.js`, `klara-app.js` / `zagloba-stations.js`, `zagloba-app.js` – each product's stations and content.
 - `zagloba-data.js` – sources, documents, questions and the pure `decide(question, settings)` (permissions, re-ranking, abstention).
 - `klara-data.js` – scenes, prompts (incl. an attachment), routes, `protectedItems()` and the pure `decide(prompt, policy)`. Invariant: protected data, in the prompt or an attachment, is never routed externally.
-- `index.html` – the shell and all CSS tokens (`--world-*` drive the 3D colours).
+- `index.html` – the home page: a choice between the two journeys, each shown as a still of its 3D server interior (`assets/home/klara.webp` = `klara.html?scene=route&prompt=sensitive`, `assets/home/zagloba.webp` = `zagloba.html?scene=rank&prompt=procedure`; `#stage` captured at 2× with labels hidden, saved as 1600 px WebP).
+- `klara.html` / `zagloba.html` – each product's shell with its accent and world tokens (`--world-*` drive the 3D colours).
 
 ## Verify
 

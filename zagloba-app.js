@@ -198,7 +198,7 @@
       hello: "Dzień dobry! Odpowiem na podstawie dokumentów organizacji i wskażę źródła.", history: ["Procedura urlopowa", "Zasady obiegu faktur"],
       chipsLabel: "Przykładowe pytania", placeholder: "Wybierz przykładowe pytanie powyżej…", placeholderNext: "Wybierz kolejne pytanie powyżej…",
       finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Jedno okno pytań dla pracownika. Odpowiedzi tylko z dokumentów, do których ma uprawnienia – ze wskazaniem źródeł.",
-      tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", sibling: { label: "Zobacz też: Klara od środka", href: "index.html" }
+      tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
     },
     autoOrder: ["procedure", "restricted", "nodata", "fresh"],
     dwell: { search: 4.5, access: 4.5, rank: 4 },

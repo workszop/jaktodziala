@@ -2,8 +2,8 @@
    A product module (KlaraStations, ZaglobaStations) adds the stations inside the rack, its inner paths and their pose.
    The world is a pure function of a snapshot: { sceneId, t (0..1), prompt, decision, callouts, reduced, ... }.
    API: WorldCore.create(product) → { init({ stage, labels, onReady, onFail }), frame(snapshot, dt), resetView(), debugCollisions(), info() }
-   Product: { config: { sceneOrder, openScene, travelScenes, shots, labels, anchors, colorKeys, ports, clouds, ariaLabel },
-              create(kit) → { build, buildPaths, pose, shot, labelVisible, labelState, sig, animating, collisionRuns } }
+   Product: { config: { sceneOrder, openScene, travelScenes, shots, labels, anchors, colorKeys, ports, clouds, office: { windows, rug }, ariaLabel },
+              create(kit) → { buildOffice, build, buildPaths, pose, shot, labelVisible, labelState, sig, animating, collisionRuns } }
    Colours come from --world-* tokens in the HTML shell; nothing here hardcodes a colour. */
 window.WorldCore = (() => {
   "use strict";
@@ -160,11 +160,13 @@ window.WorldCore = (() => {
       box(10.85, 3.0, 6.7, 6.0, FLOOR, "serverFloor");
       for (let x = 8.1; x < 14.2; x += 0.6) box(x, 3.0, 0.012, 6.0, 0.004, "tileLine", FLOOR);
       for (let z = 0.6; z < 6; z += 0.6) box(10.85, z, 6.7, 0.012, 0.004, "tileLine", FLOOR);
-      box(2.6, 2.95, 4.6, 2.3, 0.006, "rug", FLOOR);
+      const rug = P.office && "rug" in P.office ? P.office.rug : [2.6, 2.95, 4.6, 2.3];
+      if (rug) box(rug[0], rug[1], rug[2], rug[3], 0.006, "rug", FLOOR);
       // walls: office back + left, server back with an opening to the outside world
       box(3.75, 0.06, 7.5, 0.12, 1.1, "wall");
       box(0.06, 3.0, 0.12, 6.0, 1.1, "wall");
-      for (let i = 0; i < 4; i++) box(1.0 + i * 1.75, 0.125, 1.15, 0.02, 0.5, "glass", 0.4);
+      const win = { count: 4, w: 1.15, h: 0.5, y: 0.4, ...(P.office && P.office.windows) }, pitch = 7.0 / win.count;
+      for (let i = 0; i < win.count; i++) box(0.12 + pitch * (i + 0.5), 0.125, win.w, 0.02, win.h, "glass", win.y);
       const [gx0, gx1] = GATE_X;
       box((7.5 + gx0) / 2, 0.06, gx0 - 7.5, 0.12, 1.1, "wallServer");
       box((gx1 + 14.2) / 2, 0.06, 14.2 - gx1, 0.12, 1.1, "wallServer");
@@ -186,14 +188,16 @@ window.WorldCore = (() => {
     }
 
     // ─── Build: office ───
-    function deskAt(x, z, screenMat) {
-      box(x, z, 1.3, 0.66, 0.05, "wood", 0.7, world, 0.03);
-      for (const dx of [-0.6, 0.6]) for (const dz of [-0.28, 0.28]) box(x + dx, z + dz, 0.05, 0.05, 0.7, "metal");
-      cylinder(x, z - 0.18, 0.012, 0.12, "metal", 0.75);
-      box(x, z - 0.2, 0.64, 0.04, 0.4, "ink", 0.84, world, 0.015);
+    // A desk with a monitor; the user sits on the +z side (rot turns it around its centre).
+    function deskAt(x, z, screenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }), rot = 0) {
+      const g = group(x, 0, z); g.rotation.y = rot;
+      box(0, 0, 1.3, 0.66, 0.05, "wood", 0.7, g, 0.03);
+      for (const dx of [-0.6, 0.6]) for (const dz of [-0.28, 0.28]) box(dx, dz, 0.05, 0.05, 0.7, "metal", 0, g);
+      cylinder(0, -0.18, 0.012, 0.12, "metal", 0.75, g);
+      box(0, -0.2, 0.64, 0.04, 0.4, "ink", 0.84, g, 0.015);
       const screen = new THREE.Mesh(geo("plane", [0.58, 0.34], () => new THREE.PlaneGeometry(0.58, 0.34)), screenMat);
-      screen.position.set(x, 1.04, z - 0.177); world.add(screen);
-      box(x, z + 0.06, 0.42, 0.14, 0.015, "keyboard", 0.75);
+      screen.position.set(0, 1.04, -0.177); g.add(screen);
+      box(0, 0.06, 0.42, 0.14, 0.015, "keyboard", 0.75, g);
       return screen;
     }
     function plant(x, z, s = 1) {
@@ -206,15 +210,12 @@ window.WorldCore = (() => {
       cylinder(0, 0, 0.13, 0.04, "metal", 0.02, g); cylinder(0, 0, 0.03, 0.26, "metal", 0.04, g);
       box(0, 0, 0.32, 0.32, 0.06, "upholstery", 0.3, g, 0.03); box(0, -0.15, 0.32, 0.05, 0.34, "upholstery", 0.36, g, 0.02);
     }
+    // The engine builds the employee's desk and the admin console; the product furnishes the rest (S.buildOffice).
     function buildOffice() {
       const { DESK, ADMIN } = G;
       refs.screenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.25, roughness: 0.3 });
       refs.mainScreen = deskAt(DESK.x, DESK.z, refs.screenMat);
-      deskAt(4.75, 2.25, own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 })); chair(4.75, 2.95, Math.PI);
-      deskAt(4.75, 0.95 + 0.3, own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }));
-      box(0.42, 1.4, 0.5, 0.9, 1.0, "wood", 0, world, 0.02);
-      for (let i = 0; i < 3; i++) for (let k = 0; k < 4; k++) box(0.68, 1.08 + k * 0.2, 0.02, 0.14, 0.22, ["upholstery", "accent", "admin", "metal"][k], 0.08 + i * 0.32);
-      plant(0.55, 0.5); plant(7.1, 5.6, 1.15); plant(7.15, 3.4, 0.9);
+      if (S.buildOffice) S.buildOffice();
       box(ADMIN.x, ADMIN.z, 0.5, 0.36, 0.78, "rack", 0, world, 0.04);
       const head = group(ADMIN.x, 0.86, ADMIN.z); head.rotation.x = -0.5;
       box(0, 0, 0.62, 0.05, 0.4, "ink", -0.2, head, 0.015);
@@ -274,6 +275,18 @@ window.WorldCore = (() => {
       refs.frontMats = [side, side, side, side, front, side];
       refs.front = mesh(geo("box", [w + 0.02, h, 0.06], () => new THREE.BoxGeometry(w + 0.02, h, 0.06)), refs.frontMats);
       refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01);
+    }
+    // A monitor perched on the rack's back panel: a clamp over the panel's top edge and a neck under the screen's centre,
+    // so the screen can turn towards the viewer without its mount leaving the panel. Products add the screen at (0, H / 2, 0.03).
+    function rackMonitor(x, W, H, rot = 0.32) {
+      const { FLOOR, RACK } = G, top = FLOOR + RACK.h, wallZ = RACK.cz - RACK.d / 2 + 0.04, lift = 0.17;
+      box(x, wallZ, 0.24, 0.14, 0.03, "rackDark", top, world, 0.01);
+      for (const dz of [-0.065, 0.065]) box(x, wallZ + dz, 0.24, 0.012, 0.09, "rackDark", top - 0.06);
+      cylinder(x, wallZ, 0.026, lift, "metal", top + 0.03);
+      const g = group(x, top + lift, wallZ); g.rotation.y = rot;
+      box(0, -0.035, 0.16, 0.05, 0.1, "metal", -0.01, g);
+      box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
+      return g;
     }
     // Belt from the inlet along the rack's centre line.
     function belt(x0, x1) {
@@ -627,7 +640,7 @@ window.WorldCore = (() => {
         S = product.create({
           THREE, G, SHEET, colors, refs, paths, info, options, world,
           clamp, phase, ease, easeOutBack, lerp, v3, order, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture, hexPath, drawQ,
-          makePath, reverseSegments, seeded, pill, fakeText, paintMark, belt, plates, serverCabinet
+          makePath, reverseSegments, seeded, pill, fakeText, paintMark, belt, plates, serverCabinet, rackMonitor, deskAt, chair, plant
         });
         buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();
         S.build(); S.buildPaths();

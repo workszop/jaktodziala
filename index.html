@@ -4,109 +4,147 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0A1F2C">
-<meta name="description" content="Klara od środka – interaktywna podróż zapytania przez bezpieczny (i inteligentny) chat AI: od okna czatu, przez serwer organizacji i zwrotnicę modeli, z powrotem do użytkownika.">
+<meta name="description" content="Od środka – interaktywne podróże 3D przez produkty Quantica Lab. Wybierz Klarę (bezpieczny i inteligentny chat AI) albo Zagłobę (inteligentny asystent wiedzy) i zobacz, co dzieje się z zapytaniem.">
 <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
-<title>Klara od środka – jak działa bezpieczny (i inteligentny) chat AI</title>
+<title>Od środka – jak działają produkty AI Quantica Lab</title>
+<script>
+// Old deep links (index.html?scene=…) pointed at Klara before the home page existed: send them on.
+if (/[?&](scene|prompt|policy|auto|speed|selftest)=/.test(location.search)) location.replace("klara.html" + location.search + location.hash);
+</script>
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 <style>
-/* ─── Product tokens: Klara (accent = Klara orange) ─── */
+/* ─── Tokens: home (product accents mirror klara.html / zagloba.html) ─── */
 :root{
-  --accent:#c2410c;--accent-deep:#9a3412;--accent-tint:#fdf0e8;--accent-mark:#fde2cf;--ring:rgba(194,65,12,.22);
-  --world-accent:#e0560f;--world-accentTint:#fde7d8;
-  --world-providerA:#795a9c;--world-providerB:#4f46e5;--world-providerC:#197d78;
-  --world-gaugeLow:#3fb489;--world-gaugeMid:#f0b429;--world-gaugeHigh:#e0560f;--world-blocked:#b4234a;
-  --world-xrayShell:#d6dde2;--world-xrayBg:#0b2533;--world-xrayLine:#7fe3ff;
+  --accent:var(--brand);--accent-deep:var(--brand-deep);--accent-tint:var(--brand-tint);
+  --klara-accent:#c2410c;--klara-deep:#9a3412;--klara-tint:#fdf0e8;--klara-mark:#fde2cf;
+  --zagloba-accent:#197d78;--zagloba-deep:#0f5a56;--zagloba-tint:#e8f5f2;--zagloba-mark:#c9ebe3;
+  --fs-hero:clamp(28px,3.4vw,46px);--fs-card:clamp(22px,2.2vw,30px);
+  --pad-x:4.5vw;--pad-y:clamp(18px,4vh,40px);
+}
+.choice[data-app="klara"]{--accent:var(--klara-accent);--accent-deep:var(--klara-deep);--accent-tint:var(--klara-tint);--accent-mark:var(--klara-mark)}
+.choice[data-app="zagloba"]{--accent:var(--zagloba-accent);--accent-deep:var(--zagloba-deep);--accent-tint:var(--zagloba-tint);--accent-mark:var(--zagloba-mark)}
+
+/* ─── Layout ─── */
+body{overflow:auto}
+.page{min-height:100%;display:grid;grid-template-rows:auto 1fr}
+.top .hint{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--chrome-muted);white-space:nowrap}
+.top .hint kbd{font-family:var(--font-mono);border:1px solid var(--chrome-line);border-radius:5px;padding:1px 6px;color:var(--chrome-ink)}
+.home{display:grid;grid-template-rows:auto 1fr auto;gap:var(--pad-y);padding:var(--pad-y) var(--pad-x)}
+
+/* ─── Intro ─── */
+.intro{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px 5vw;align-items:end}
+.kicker{grid-column:1/-1;font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--brand)}
+.intro h1{font-size:var(--fs-hero);line-height:1.05;font-weight:900;letter-spacing:-.02em}
+.intro p{font-size:var(--fs-lg);color:var(--ink-soft);max-width:62ch}
+
+/* ─── Product choices ─── */
+.choices{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(14px,2vw,28px)}
+.choices>li{display:flex;animation:slide .5s both}
+.choices>li:nth-child(2){animation-delay:.08s}
+.choice{flex:1;display:flex;flex-direction:column;text-decoration:none;color:var(--ink);background:var(--surface-raised);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--radius-lg);overflow:hidden;transition:var(--transition)}
+.choice:hover,.choice:focus-visible{border-color:var(--accent);box-shadow:var(--shadow-md);transform:translateY(-3px)}
+.choice:focus-visible{outline:3px solid var(--ring,var(--accent-mark));outline-offset:2px}
+
+.shot{position:relative;flex:1;min-height:260px;margin:0;background:var(--world-background);overflow:hidden}
+.shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 55%;display:block;transition:opacity .35s ease}
+.shot::after{content:"";position:absolute;inset:0;background:var(--accent);opacity:0;transition:opacity .35s ease;pointer-events:none}
+.choice:hover .shot::after,.choice:focus-visible .shot::after{opacity:.08}
+
+.cap{display:flex;align-items:center;gap:16px;padding:16px 20px;border-top:1px solid var(--line)}
+.mark{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--surface-raised);font-weight:900;font-size:var(--fs-xl)}
+.name{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.name h2{font-size:var(--fs-card);line-height:1.1;font-weight:900;letter-spacing:-.01em}
+.tag{font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.go{flex:none;display:flex;align-items:center;gap:10px}
+.go kbd{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--ink-mute);border:1px solid var(--line-2);border-radius:5px;padding:1px 7px}
+.go i{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--surface-raised)}
+.choice:hover .go i{background:var(--accent-deep)}
+.go svg{transition:transform var(--transition)}
+.choice:hover .go svg{transform:translateX(3px)}
+
+.note{font-size:var(--fs-sm);color:var(--ink-mute)}
+
+/* ─── Responsive ─── */
+@media (max-width:768px){
+  .top .hint{display:none}
+  .intro{grid-template-columns:minmax(0,1fr)}
+  .choices{grid-template-columns:minmax(0,1fr)}
+  .shot{flex:none;min-height:0;aspect-ratio:4/3}
+  .cap{padding:12px 14px;gap:12px}.mark,.go i{width:38px;height:38px}.go kbd{display:none}
 }
 </style>
 </head>
 <body>
-<div class="app" id="app" data-renderer="loading" data-scene="login">
+<div class="page">
   <header class="top">
     <div class="brand">
       <img src="assets/brand/quantica-logo-white.png" alt="Quantica Lab">
       <span class="divider" aria-hidden="true"></span>
-      <h1>Klara od środka</h1>
-      <span class="label">bezpieczny (i inteligentny) chat AI · interaktywna podróż zapytania</span>
+      <h1>Od środka</h1>
+      <span class="label">interaktywne podróże 3D przez produkty AI</span>
     </div>
-    <div class="tools">
-      <div class="modesw" id="modeSwitch" role="group" aria-label="Tryb odtwarzania (A przełącza)" title="Tryb odtwarzania (A)">
-        <button id="btnAuto" type="button" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5v15l13-7.5z"/></svg><span class="txt">Auto</span></button>
-        <button id="btnStep" type="button" aria-pressed="false"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14l9-7z"/><path d="M18 5v14"/></svg><span class="txt">Krok po kroku</span></button>
-        <kbd>A</kbd>
-      </div>
-      <button class="hbtn" id="btnRestart" type="button" title="Od nowa (R)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="txt">Od nowa</span> <kbd>R</kbd></button>
-      <button class="hbtn" id="btnHelp" type="button" title="Pomoc (H)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><path d="M12 17h.01"/></svg><span class="txt">Pomoc</span> <kbd>H</kbd></button>
-    </div>
+    <span class="hint">wybór: <kbd>1</kbd> <kbd>2</kbd></span>
   </header>
 
-  <nav class="steps" aria-label="Etapy podróży zapytania"><ol id="steps"></ol></nav>
-
-  <main class="main">
-    <section class="stage" id="stage" aria-label="Scena">
-      <div class="world-labels" id="labels"></div>
-      <div class="loading" aria-hidden="true">ŁADOWANIE ŚWIATA 3D…</div>
-      <div class="schema" id="schema" aria-hidden="true"><div class="flow" id="flowBig"><div class="zone"><span>Quantica AI Server · organizacja</span></div></div></div>
-      <div class="monitor" id="monitor" role="region" aria-label="Ekran pracownika"><div class="display" id="display"></div></div>
-      <div class="final" id="final" role="region" aria-label="Podsumowanie"></div>
-      <div class="status" id="status" role="status" aria-live="polite"></div>
-      <div class="sr-only" id="announce" aria-live="polite"></div>
-      <div class="stage-hint" id="stageHint">Przeciągnij – obrót · kółko – przybliżenie · dwuklik – reset widoku</div>
+  <main class="home" id="home" data-apps="2" data-ready="false">
+    <section class="intro" aria-labelledby="introTitle">
+      <span class="kicker">Jak to działa</span>
+      <h1 id="introTitle">Zajrzyj do środka i zobacz, co dzieje się z Twoim pytaniem</h1>
+      <p>Każda podróż prowadzi od stanowiska pracownika, przez serwer organizacji, z powrotem do odpowiedzi. Możesz oglądać ją w trybie Auto albo przechodzić krok po kroku.</p>
     </section>
 
-    <aside class="panel" id="panel" aria-label="Narracja">
-      <div class="panel-body">
-        <div class="kicker"><span class="num" id="pNum">01</span><span id="pShort">Prolog</span></div>
-        <div aria-live="polite" aria-atomic="true"><h2 id="pTitle">Shadow AI</h2></div>
-        <div class="prog" role="progressbar" aria-label="Postęp etapu" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="pProg"><i></i></div>
-        <p class="lead" id="pLead"></p>
-        <ul class="bullets" id="pBullets"></ul>
-        <div class="side-actions" id="pActions"></div>
-        <div class="box" id="inspector" hidden>
-          <h3>Zawartość pakietu</h3>
-          <div class="packet-text" id="iText"></div>
-          <div class="att-box" id="iAtt" hidden></div>
-          <ul class="checks" id="iChecks"></ul>
-          <div class="routes" id="iRoutes"></div>
-          <p class="meta" id="iMeta"></p>
-        </div>
-        <div class="box">
-          <h3>Gdzie jest zapytanie</h3>
-          <div class="flow" id="flow"></div>
-        </div>
-      </div>
-      <div class="panel-foot">
-        <button class="btn btn-ghost" id="btnBack" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Wstecz</button>
-        <button class="btn btn-primary" id="btnNext" type="button"><span id="nextLabel">Dalej</span><kbd>→</kbd></button>
-      </div>
-    </aside>
-  </main>
+    <ul class="choices" aria-label="Wybierz podróż">
+      <li>
+        <a class="choice" href="klara.html" data-app="klara" data-key="1" aria-keyshortcuts="1">
+          <figure class="shot"><img src="assets/home/klara.webp" width="1600" height="1236" alt="Wnętrze serwera Klary: skaner, miernik złożoności i zwrotnica – wyjścia do modeli zewnętrznych zamknięte kłódkami, zielony tor prowadzi do lokalnych modeli"></figure>
+          <div class="cap">
+            <span class="mark" aria-hidden="true">K</span>
+            <div class="name"><h2>Klara od środka</h2><span class="tag">bezpieczny (i inteligentny) chat AI</span></div>
+            <span class="go"><kbd>1</kbd><i><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></i></span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a class="choice" href="zagloba.html" data-app="zagloba" data-key="2" aria-keyshortcuts="2">
+          <figure class="shot"><img src="assets/home/zagloba.webp" width="1600" height="1236" alt="Wnętrze serwera Zagłoby: regały bazy wiedzy, bramka uprawnień, podium najtrafniejszych dokumentów i szafa z modelem lokalnym"></figure>
+          <div class="cap">
+            <span class="mark" aria-hidden="true">Z</span>
+            <div class="name"><h2>Zagłoba od środka</h2><span class="tag">inteligentny asystent wiedzy</span></div>
+            <span class="go"><kbd>2</kbd><i><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></i></span>
+          </div>
+        </a>
+      </li>
+    </ul>
 
-  <dialog id="help" aria-labelledby="helpTitle">
-    <h3 id="helpTitle">Jak korzystać</h3>
-    <div class="keys">
-      <kbd>→ N Spacja</kbd><span>dalej (pierwsze naciśnięcie kończy animację etapu)</span>
-      <kbd>←</kbd><span>wstecz</span>
-      <kbd>1 2 3 4</kbd><span>wybór polecenia w oknie czatu (4 – z załącznikiem)</span>
-      <kbd>Enter</kbd><span>wyślij polecenie do Klary</span>
-      <kbd>A</kbd><span>przełącz tryb: Auto (domyślny, pętla kioskowa) ↔ Krok po kroku; kliknięcie przycisku lub klawisz nawigacji przełącza na Krok po kroku</span>
-      <kbd>R</kbd><span>od nowa</span>
-      <kbd>F</kbd><span>pełny ekran</span>
-      <kbd>Esc</kbd><span>zamknij okno</span>
-    </div>
-    <p class="meta">Symulacja poglądowa na danych przykładowych (fikcyjne osoby, numery i firma). Nie wywołuje rzeczywistych modeli. Opis działania według strony produktu Klara.</p>
-    <div class="probe-out" id="probeOut"></div>
-    <div class="dlg-actions">
-      <button class="btn" id="btnProbe" type="button">Diagnostyka demo</button>
-      <button class="btn btn-primary" id="btnHelpClose" type="button" style="flex:none">Zamknij</button>
-    </div>
-  </dialog>
+    <p class="note">Symulacje poglądowe na danych przykładowych (fikcyjne osoby, dokumenty i firma). Nie wywołują rzeczywistych modeli.</p>
+    <div class="sr-only" id="announce" aria-live="polite"></div>
+  </main>
 </div>
-<script src="klara-data.js"></script>
-<script src="world-core.js"></script>
-<script src="klara-stations.js"></script>
-<script src="app-core.js"></script>
-<script src="klara-app.js"></script>
+<script>
+(() => {
+  // ─── DOM refs ───
+  const home = document.getElementById("home");
+  const announce = document.getElementById("announce");
+  const choices = [...home.querySelectorAll(".choice")];
+
+  // ─── Helpers ───
+  const open = choice => {
+    announce.textContent = "Otwieram: " + choice.querySelector("h2").textContent;
+    location.href = choice.getAttribute("href");
+  };
+
+  // ─── Listeners ───
+  document.addEventListener("keydown", e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const choice = choices.find(c => c.dataset.key === e.key);
+    if (choice) { e.preventDefault(); open(choice); }
+  });
+
+  // ─── Init ───
+  home.dataset.ready = "true";
+})();
+</script>
 </body>
 </html>

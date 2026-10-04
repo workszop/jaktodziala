@@ -6,7 +6,9 @@ window.ZaglobaStations = {
     sceneOrder: ["login", "chat", "send", "search", "access", "rank", "model", "return", "admin", "final"],
     openScene: "search",
     travelScenes: ["search", "access", "rank", "model"],
-    colorKeys: ["srcA", "srcB", "srcC", "xrayBg", "xrayLine", "podium", "tube", "lockRed"],
+    colorKeys: ["srcA", "srcB", "srcC", "xrayBg", "xrayLine", "podium", "tube", "lockRed", "cabinet", "lampShade"],
+    // library-like office: three tall windows, a rug under the reading table
+    office: { windows: { count: 3, w: 1.55, h: 0.56, y: 0.4 }, rug: [5.0, 2.1, 2.5, 2.1] },
     ports: [9.2],
     clouds: [
       { key: "sharepoint", pos: [9.0, 3.1, -2.7], ring: "srcA", emblem: "docs" },
@@ -21,7 +23,7 @@ window.ZaglobaStations = {
       sources: { target: [10.9, 2.2, -1.5], span: 5.4, angle: 0.5, elev: 0.3 }
     },
     labels: [
-      { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.08, 1.66], scenes: ["search", "access", "rank"] },
+      { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.25, 1.74], scenes: ["search", "access", "rank"] },
       { id: "index", text: "Baza wiedzy · indeks", color: "srcA", pos: [9.2, 1.1, 2.0], scenes: ["search"] },
       { id: "gate", text: "Kontrola uprawnień", color: "admin", pos: [10.05, 1.08, 2.7], scenes: ["access"] },
       { id: "skipped", text: "Pominięte · brak uprawnień", color: "lockRed", pos: [9.95, 0.6, 3.45], scenes: ["access", "rank"] },
@@ -33,7 +35,7 @@ window.ZaglobaStations = {
       { id: "s3", text: "Amazon S3", color: "srcC", pos: [13.5, 3.95, -2.7], scenes: ["send", "admin", "final"] }
     ],
     anchors: {
-      monitor: [8.62, 1.6, 1.9], index: [8.75, 0.9, 2.05], search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], skipped: [9.95, 0.42, 3.45],
+      monitor: [8.6, 1.74, 1.94], index: [8.75, 0.9, 2.05], search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], skipped: [9.95, 0.42, 3.45],
       podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], connectors: [10.75, 1.82, 1.72], sharepoint: [9.0, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server z bazą wiedzy i źródła danych organizacji. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
@@ -142,9 +144,7 @@ window.ZaglobaStations = {
     }
     // Results monitor above the back panel: candidates, scores, access, rank.
     function buildMonitor() {
-      const W = 1.3, H = 0.775, g = group(SEARCH[0] - 0.02, FLOOR + 1.12, 1.66); g.rotation.y = 0.32;
-      box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
-      for (const dx of [-0.45, 0.45]) box(dx, 0.02, 0.05, 0.05, 0.14, "metal", -0.14, g);
+      const W = 1.3, H = 0.775, g = k.rackMonitor(SEARCH[0] - 0.02, W, H);
       refs.monCanvas = document.createElement("canvas"); refs.monCanvas.width = 1024; refs.monCanvas.height = 610;
       refs.monTex = new THREE.CanvasTexture(refs.monCanvas); refs.monTex.colorSpace = THREE.SRGBColorSpace; refs.monTex.anisotropy = 4;
       const screen = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: refs.monTex, toneMapped: false })); screen.position.set(0, H / 2, 0.03); g.add(screen);
@@ -191,6 +191,33 @@ window.ZaglobaStations = {
         refs.pipes[sid] = curve;
       }
       for (let i = 0; i < 3; i++) { const m = own(Object.values(SRC_TONE)[i], { emissive: colors[Object.values(SRC_TONE)[i]], emissiveIntensity: 1.4 }); const p = sphere(0, 0, 0, 0.035, m); p.visible = false; p.userData.noCollide = true; refs.pipePulses.push(p); }
+    }
+    // ─── Office: a knowledge office – bookcases, a low file cabinet, a reading table and a floor lamp ───
+    function buildOffice() {
+      const rnd = seeded(7), SPINES = ["srcA", "srcB", "srcC", "accent", "paper", "admin"];
+      // tall bookcases along the left wall, books facing the room
+      for (const cz of [1.0, 2.12]) {
+        box(0.3, cz, 0.4, 1.06, 1.06, "wood", 0, undefined, 0.02);
+        for (let row = 0; row < 4; row++) {
+          const y = 0.06 + row * 0.25; box(0.51, cz, 0.02, 1.0, 0.02, "wood", y);
+          for (let z = cz - 0.47; z < cz + 0.44;) { const w = 0.05 + rnd() * 0.05, h = 0.13 + rnd() * 0.07; if (rnd() > 0.12) box(0.51, z + w / 2, 0.035, w - 0.008, h, SPINES[Math.floor(rnd() * SPINES.length)], y + 0.02); z += w; }
+        }
+      }
+      // low file cabinet under the first window, binders on top
+      box(1.45, 0.34, 1.5, 0.4, 0.44, "cabinet", 0, undefined, 0.02);
+      for (let i = 0; i < 3; i++) for (let r = 0; r < 2; r++) box(0.98 + i * 0.47, 0.545, 0.16, 0.015, 0.02, "metal", 0.12 + r * 0.18);
+      for (let i = 0; i < 7; i++) box(0.95 + i * 0.075, 0.32, 0.06, 0.26, 0.2, SPINES[i % 4], 0.44);
+      // reading table with four chairs, books and a laptop
+      const T = [5.0, 2.1];
+      cylinder(T[0], T[1], 0.24, 0.03, "metal"); cylinder(T[0], T[1], 0.04, 0.7, "metal"); cylinder(T[0], T[1], 0.56, 0.04, "wood", 0.7, undefined, 0.56, 28);
+      for (const a of [0.6, 2.2, 3.75, 5.35]) { const dx = Math.cos(a) * 0.82, dz = Math.sin(a) * 0.82; k.chair(T[0] + dx, T[1] + dz, Math.atan2(-dx, -dz)); }
+      box(4.82, 2.0, 0.32, 0.22, 0.015, "ink", 0.74); box(4.82, 1.9, 0.32, 0.02, 0.2, "ink", 0.74);
+      box(5.2, 2.25, 0.22, 0.16, 0.04, "srcA", 0.74); box(5.21, 2.24, 0.2, 0.15, 0.03, "srcC", 0.78);
+      // a desk by the partition and a floor lamp next to the reading table
+      k.deskAt(6.4, 1.12); k.chair(6.4, 1.8, Math.PI);
+      cylinder(3.85, 3.0, 0.13, 0.02, "metal"); cylinder(3.85, 3.0, 0.014, 1.18, "metal");
+      cylinder(3.85, 3.0, 0.17, 0.16, own("lampShade", { emissive: colors.lampShade, emissiveIntensity: 0.35 }), 1.12, undefined, 0.1);
+      k.plant(0.45, 3.1, 1.2); k.plant(7.1, 5.6, 1.15); k.plant(7.15, 3.4, 0.9);
     }
     function build() {
       k.belt(8.475, 10.925);
@@ -353,7 +380,7 @@ window.ZaglobaStations = {
       return Z.PROMPTS.map(p => ({ prompt: p, decision: Z.decide(p, {}), label: p.id }));
     }
     return {
-      build, buildPaths, pose, shot, labelVisible, collisionRuns,
+      buildOffice, build, buildPaths, pose, shot, labelVisible, collisionRuns,
       sig: s => (s.decision ? s.decision.ranked.join(",") + "|" + s.decision.skipped.join(",") : ""),
       animating: s => s.sceneId === "admin" || s.sceneId === "model" || s.sceneId === "return"
     };
