@@ -1,6 +1,6 @@
 /* Zagłoba od środka – product layer for the shared app shell (app-core.js): retrieval decision and access settings,
    narration, in-world callouts, inspector (question, candidates, citations), chat answers with sources, admin panel
-   (data sources + user's access to the board folder) and probes. */
+   content (data sources + user's access to the board folder) and probes. */
 (() => {
   "use strict";
 
@@ -13,9 +13,11 @@
     answer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 12h7M8.5 9h4"/></svg>',
     sources: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>'
   };
+  const USER_LINE = Z.USER.name + " · " + Z.USER.dept;
+
+  // ─── Helpers ───
   const docTitle = id => Z.DOCS[id].title;
   const srcTitle = id => Z.SOURCES[Z.DOCS[id].source].title;
-  const USER_LINE = Z.USER.name + " · " + Z.USER.dept;
 
   // ─── Hooks ───
   const hooks = {
@@ -43,15 +45,10 @@
       return out;
     },
 
-    flowStates(c, id, t, d) {
-      const st = {}, path = ["desk", "cable", "search", "access", "rank", "local"], o = c.IDX[id];
-      const activeAt = { login: "desk", chat: "desk", send: "cable", search: "search", access: "access", rank: "rank", model: "local" };
-      if (activeAt[id]) { const k = path.indexOf(activeAt[id]); path.forEach((n, i) => { st[n] = i < k ? "done" : i === k ? "active" : "idle"; }); }
-      if (o >= c.IDX.return) path.forEach(n => { st[n] = "done"; });
+    // Flow extras on top of the core's packet path: the sync pulse from the sources and the answer node.
+    flowStates(c, st, id, t, d) {
       if (id === "search" && d && d.fresh.length && t < 0.3) st.sources = "active";
-      if (d && (o > c.IDX.model || (id === "model" && t >= 0.5))) st.answer = d.outcome === "answer" ? "chosen" : "blocked";
-      if (id === "return") st.desk = t >= 0.82 ? "active" : "done";
-      return st;
+      if (d && (c.IDX[id] > c.IDX.model || (id === "model" && t >= 0.5))) st.answer = d.outcome === "answer" ? "chosen" : "blocked";
     },
 
     narration(c) {
@@ -82,16 +79,9 @@
       }
     },
 
-    panelActions(c) {
-      const id = c.sid(), out = [];
-      if (id === "return") out.push(c.button("btn btn-ghost", "Inne pytanie", () => c.startRun(c.nextUntried())));
-      if (id === "access" || id === "rank") out.push(c.button("btn btn-ghost", "Zmień uprawnienia w panelu", () => { c.state.reached = Math.max(c.state.reached, c.IDX.admin); c.goTo(c.IDX.admin); }));
-      return out;
-    },
-
     renderInspector(c) {
       const { el, icon, $, after, setText } = c, p = c.prompt(), d = c.decision();
-      const iText = $("iText"), iDocs = $("iDocs"), iChecks = $("iChecks"), iMeta = $("iMeta");
+      const iText = $("iText"), iDocs = $("iDocs"), iMeta = $("iMeta");
       if (iText.dataset.prompt !== p.id) { iText.textContent = p.text; iText.dataset.prompt = p.id; }
       const found = after("search", 0.75), access = after("access", 0.6), rank = after("rank", 0.6);
       const key = [p.id, found, access, rank, JSON.stringify(c.settings())].join("|");
@@ -105,14 +95,7 @@
           iDocs.appendChild(row);
         });
       }
-      const done = [found, access, rank];
-      if (!iChecks.children.length) [0, 1, 2].forEach(() => { const li = el("li"); li.append(el("i"), el("span")); iChecks.appendChild(li); });
-      const pending = ["przeszukiwanie bazy wiedzy", "kontrola uprawnień", "ocena trafności"];
-      [...iChecks.children].forEach((li, n) => {
-        const stt = !done[n] ? "pending" : (n === 1 && d.skipped.length) || (n === 2 && d.outcome === "nodata") ? "flag" : "ok";
-        if (li.dataset.state !== stt) { li.dataset.state = stt; li.firstChild.innerHTML = stt === "pending" ? "" : stt === "flag" ? c.ICONS.lock.replace('width="14" height="14"', 'width="10" height="10"') : c.ICONS.check; }
-        setText(li.lastChild, done[n] ? d.checks[n] : pending[n] + " …");
-      });
+      c.renderChecks(["przeszukiwanie bazy wiedzy", "kontrola uprawnień", "ocena trafności"], [found, access, rank], [false, d.skipped.length > 0, d.outcome === "nodata"], d.checks);
       setText(iMeta, after("model", 0.5) ? d.badge : "");
     },
 
@@ -131,39 +114,25 @@
     runLine: (c, r) => [Z.promptById(r.promptId).label + (r.settings.boardAccess ? " · z dostępem do folderu Zarządu" : ""),
       r.outcome === "answer" ? "odpowiedź · źródła: " + r.citations.length : "brak danych → " + Z.promptById(r.promptId).redirect],
 
-    buildAdmin(c) {
-      const { el, icon, button, state } = c;
-      const wrap = el("div", "adm"), h = el("h3"); h.append(el("div", "kmark", "Z"), document.createTextNode("Zagłoba · panel organizacji"));
-      const runs = state.runs, left = el("div"), tiles = el("div", "tiles");
-      [["Pytania", runs.length, ""], ["Odpowiedzi ze źródłami", runs.filter(r => r.outcome === "answer").length, "ok"], ["Brak pokrycia", runs.filter(r => r.outcome === "nodata").length, "admin"],
-        ["Dokumenty pominięte (uprawnienia)", runs.reduce((a, r) => a + r.skipped.length, 0), "danger"], ["Źródła danych", Z.SOURCE_IDS.length, ""], ["Przypisy w odpowiedziach", runs.reduce((a, r) => a + r.citations.length, 0), ""]]
-        .forEach(([label, n, tone]) => { const tl = el("div", "tile"); tl.dataset.tone = tone; tl.append(el("b", null, String(n)), el("span", null, label)); tiles.appendChild(tl); });
-      const srcCard = el("div", "card"), list = el("ul", "log");
-      srcCard.append(el("h4", null, "Źródła danych · synchronizacja w tle"), list);
-      Z.SOURCE_IDS.forEach(sid => { const li = el("li"), n = Object.values(Z.DOCS).filter(doc => doc.source === sid).length; li.append(el("span", null, Z.SOURCES[sid].title + " · " + n + " dokumenty (demo)"), el("em", null, sid === "sharepoint" ? "zmiana wykryta wczoraj" : "aktualne")); list.appendChild(li); });
-      left.append(el("h4", null, "Wykorzystanie (ta sesja demo)"), tiles, srcCard);
-      const right = el("div", "card"), rule = el("div", "rule"), rt = el("div");
-      rt.append(el("b", null, "Role i poziomy dostępu są zachowane"), el("div", null, "Odpowiedzi powstają wyłącznie z dokumentów, do których użytkownik ma uprawnienia."));
-      rule.append(icon("lock"), rt);
-      const opts = el("div", "opts"); opts.setAttribute("role", "radiogroup"); opts.setAttribute("aria-label", "Dostęp użytkownika do folderu Zarządu");
-      [[false, "Brak dostępu", "folder Zarządu niedostępny dla " + Z.USER.name], [true, "Dostęp nadany", "np. po delegowaniu do projektu inwestycji"]].forEach(([val, label, sub]) => {
-        const b = button("opt", null, () => c.setSettings({ boardAccess: val }, `[data-access="${val}"]`)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings.boardAccess === val)); b.dataset.access = String(val);
-        const tx = el("div"); tx.append(el("b", null, label), el("small", null, sub)); b.append(el("i"), tx); opts.appendChild(b);
-      });
-      const rerun = button("btn-admin", "Zadaj ponownie pytanie o projekt", () => c.startRun("restricted"));
-      right.append(el("h4", null, "Uprawnienia: " + Z.USER.name + " · folder Zarządu"), rule, opts, rerun);
-      wrap.append(h, left, right); return wrap;
+    // Admin console content (usage, data sources); the core builds the panel around it with the access options.
+    admin(c) {
+      const runs = c.state.runs;
+      return {
+        usage: "Wykorzystanie (ta sesja demo)",
+        tiles: [["Pytania", runs.length, ""], ["Odpowiedzi ze źródłami", runs.filter(r => r.outcome === "answer").length, "ok"], ["Brak pokrycia", runs.filter(r => r.outcome === "nodata").length, "admin"],
+          ["Dokumenty pominięte (uprawnienia)", runs.reduce((a, r) => a + r.skipped.length, 0), "danger"], ["Źródła danych", Z.SOURCE_IDS.length, ""], ["Przypisy w odpowiedziach", runs.reduce((a, r) => a + r.citations.length, 0), ""]],
+        logTitle: "Źródła danych · synchronizacja w tle",
+        log: Z.SOURCE_IDS.map(sid => [Z.SOURCES[sid].title + " · " + Object.values(Z.DOCS).filter(doc => doc.source === sid).length + " dokumenty (demo)", sid === "sharepoint" ? "zmiana wykryta wczoraj" : "aktualne"]),
+        settingsTitle: "Uprawnienia: " + Z.USER.name + " · folder Zarządu",
+        rule: ["Role i poziomy dostępu są zachowane", "Odpowiedzi powstają wyłącznie z dokumentów, do których użytkownik ma uprawnienia."],
+        rerun: ["Zadaj ponownie pytanie o projekt", "restricted"]
+      };
     },
 
-    contract(c, ds, p, d) {
-      ds.outcome = d ? d.outcome : ""; ds.cited = d ? d.citations.join(",") : ""; ds.skipped = d ? d.skipped.join(",") : "";
-      ds.boardAccess = String(!!c.state.settings.boardAccess);
-    },
-    applyParams(c, params) { if (params.get("access") === "board") { c.state.settings = { boardAccess: true }; c.state.runSettings = { boardAccess: true }; } },
-    api: c => ({ setAccess: val => c.setSettings({ boardAccess: !!val }, `[data-access="${!!val}"]`) }),
+    contract(c, ds, p, d) { ds.outcome = d ? d.outcome : ""; ds.cited = d ? d.citations.join(",") : ""; ds.skipped = d ? d.skipped.join(",") : ""; },
 
-    probe(c, failures, p, d, wi, done) {
-      const { $, IDX, state, after, display } = c, ds = document.getElementById("app").dataset, s = c.settings();
+    probe(c, failures, { p, d, wi, done, ds }) {
+      const { $, IDX, state, after, display } = c, s = c.settings();
       if (!p) return;
       // permission invariant on every surface: decision, inspector, chat
       for (const cid of d.citations) if (!Z.canRead(Z.DOCS[cid], s)) failures.push("permission-citation:" + cid);
@@ -182,7 +151,6 @@
         if (ds.scene === "model" && wi.blade !== 0) failures.push("world-blade-left-open");
       }
     },
-    selfTestRuns: () => Z.PROMPTS.flatMap(pr => [false, true].map(b => ({ promptId: pr.id, settings: { boardAccess: b }, label: pr.id + (b ? "/zarząd" : "") }))),
     selfTestCheck(c, results) {
       c.state.runs.forEach(r => { for (const cid of r.citations) if (!Z.canRead(Z.DOCS[cid], r.settings)) results.push("run-permission:" + r.promptId + "/" + cid); });
     }
@@ -197,19 +165,23 @@
       hello: "Dzień dobry! Odpowiem na podstawie dokumentów organizacji i wskażę źródła.", history: ["Procedura urlopowa", "Zasady obiegu faktur"],
       chipsLabel: "Przykładowe pytania", placeholder: "Wybierz przykładowe pytanie powyżej…", placeholderNext: "Wybierz kolejne pytanie powyżej…",
       finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Jedno okno pytań dla pracownika. Odpowiedzi tylko z dokumentów, do których ma uprawnienia – ze wskazaniem źródeł.",
-      tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
+      tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", otherPrompt: "Inne pytanie", adminJump: "Zmień uprawnienia w panelu", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
     },
     autoOrder: ["procedure", "restricted", "nodata", "fresh"],
     dwell: { search: 4.5, access: 4.5, rank: 4 },
     calloutScenes: ["search", "access", "rank", "model"],
-    nextLabels: { chat: "Zapytaj Zagłobę", send: "Zajrzyj do środka", return: "Panel organizacji", admin: "Podsumowanie", final: "Zacznij od nowa" },
+    // the admin panel's one setting: the user's access to the board folder (?access=board, App.setAccess, data-board-access)
+    setting: { key: "boardAccess", param: "access", attr: "boardAccess", dataKey: "access", api: "setAccess", coerce: Boolean, label: "Dostęp użytkownika do folderu Zarządu",
+      options: [{ value: false, tag: "", label: "Brak dostępu", sub: "folder Zarządu niedostępny dla " + Z.USER.name },
+        { value: true, param: "board", tag: "/zarząd", label: "Dostęp nadany", sub: "np. po delegowaniu do projektu inwestycji" }] },
+    adminFrom: ["access", "rank"],
+    nextLabels: { chat: "Zapytaj Zagłobę" },
     flowNodes: [
       { id: "desk", label: "Stanowisko" }, { id: "cable", label: "Kabel do serwera" }, { id: "sources", label: "Źródła danych" },
       { id: "search", label: "Wyszukiwanie" }, { id: "access", label: "Uprawnienia" }, { id: "rank", label: "Trafność" },
       { id: "local", label: "Model lokalny" }, { id: "answer", label: "Odpowiedź ze źródłami" }
     ],
-    defaultSettings: () => ({ ...Z.DEFAULT_SETTINGS }),
-    decide: (p, s) => Z.decide(p, s),
+    flowPath: ["desk", "cable", "search", "access", "rank", "local"],
     hooks
   });
 })();

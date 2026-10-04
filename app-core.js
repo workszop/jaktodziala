@@ -1,7 +1,8 @@
 /* App core – the shared shell of the "… od środka" apps: scene state machine, stepper, narration panel, desktop with
    the product window (login, chat), final card, Auto / Krok po kroku, keyboard, DOM contract (data-* on #app),
-   App.probe() / App.selfTest(). A product supplies its data, decision, settings and content hooks:
-   AppCore.start({ data, world, brand, autoOrder, dwell, icons, flowNodes, defaultSettings, decide, hooks }). */
+   App.probe() / App.selfTest(), the admin panel and the product's one admin setting (URL param, App.<api>, data-<attr>,
+   self-test matrix). A product supplies its data, setting and content hooks:
+   AppCore.start({ data, world, brand, setting, autoOrder, dwell, icons, flowNodes, flowPath, adminFrom, nextLabels, hooks }). */
 window.AppCore = (() => {
   "use strict";
 
@@ -12,6 +13,7 @@ window.AppCore = (() => {
     local: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>',
     check: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
     lock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    lockSm: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     ok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
     clip: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 12-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg>',
     doc: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>',
@@ -21,20 +23,22 @@ window.AppCore = (() => {
     trash: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
     send: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>'
   };
+  const NEXT_LABELS = { send: "Zajrzyj do środka", return: "Panel organizacji", admin: "Podsumowanie", final: "Zacznij od nowa" };
   const NAV_KEYS = ["arrowright", "arrowleft", "pagedown", "pageup", " ", "n", "enter", "1", "2", "3", "4", "r"];
 
   function start(P) {
-    const K = P.data, W = P.world, B = P.brand, H = P.hooks;
+    const K = P.data, W = P.world, B = P.brand, H = P.hooks, SET = P.setting;
+    const decide = P.decide || K.decide, defaultSettings = P.defaultSettings || (() => ({ ...K.DEFAULT_SETTINGS }));
     const SCENES = K.SCENES, IDX = Object.fromEntries(SCENES.map((s, i) => [s.id, i]));
     const ICONS = { ...BASE_ICONS, ...(P.icons || {}) };
-    const AUTO_ORDER = P.autoOrder, DWELL = { login: 2.4, admin: 6, final: 9, default: 3.4, ...(P.dwell || {}) };
+    const AUTO_ORDER = P.autoOrder, DWELL = { login: 2.4, admin: 6, final: 9, default: 3.4, ...(P.dwell || {}) }, NEXT = { ...NEXT_LABELS, ...(P.nextLabels || {}) };
     const PARAMS = new URLSearchParams(location.search);
     const SPEED = Math.min(4, Math.max(0.25, parseFloat(PARAMS.get("speed")) || 1));
     const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // ─── State ───
     const state = {
-      scene: 0, t: 0, playing: false, promptId: null, settings: P.defaultSettings(), runSettings: null,
+      scene: 0, t: 0, playing: false, promptId: null, settings: defaultSettings(), runSettings: null,
       runId: 0, recorded: -1, runs: [], reached: 0, auto: false, dwell: 0, fresh: false, announced: "",
       renderer: "loading", monitorKey: "", progressKey: "", lastFrame: performance.now()
     };
@@ -52,7 +56,7 @@ window.AppCore = (() => {
     const sid = () => sceneDef().id;
     const prompt = () => K.promptById(state.promptId);
     const settings = () => state.runSettings || state.settings;
-    const decision = () => P.decide(prompt(), settings());
+    const decision = () => decide(prompt(), settings());
     const phase = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
     const after = (id, t0 = 1) => state.scene > IDX[id] || (state.scene === IDX[id] && state.t >= t0);
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -64,18 +68,31 @@ window.AppCore = (() => {
       return AUTO_ORDER.find(id => !tried.has(id)) || AUTO_ORDER[(AUTO_ORDER.indexOf(state.promptId) + 1) % AUTO_ORDER.length];
     };
     // Text as DOM with fragments wrapped in <mark> (never innerHTML with data). mode: plain | found | masked.
-    function markNodes(text, list, mode, cls = "pii") {
+    function markNodes(text, list, mode) {
       const frag = document.createDocumentFragment(); let rest = text;
       if (mode === "plain") { frag.appendChild(document.createTextNode(rest)); return frag; }
       for (const item of list) {
         const at = rest.indexOf(item.text); if (at < 0) continue;
         frag.appendChild(document.createTextNode(rest.slice(0, at)));
-        const m = el("mark", cls, mode === "masked" ? item.token : item.text);
+        const m = el("mark", "pii", mode === "masked" ? item.token : item.text);
         if (item.kind) { m.dataset.kind = item.kind; m.title = item.kind; } m.dataset.masked = String(mode === "masked"); frag.appendChild(m);
         rest = rest.slice(at + item.text.length);
       }
       frag.appendChild(document.createTextNode(rest)); return frag;
     }
+    // Inspector check list: one row per pipeline check – its pending label until done, then the decision's text with an ok / flag icon.
+    function renderChecks(pending, done, flagged, texts) {
+      const list = $("iChecks");
+      if (!list.children.length) pending.forEach(() => { const li = el("li"); li.append(el("i"), el("span")); list.appendChild(li); });
+      [...list.children].forEach((li, k) => {
+        const stt = !done[k] ? "pending" : flagged[k] ? "flag" : "ok";
+        if (li.dataset.state !== stt) { li.dataset.state = stt; li.firstChild.innerHTML = stt === "pending" ? "" : stt === "flag" ? ICONS.lockSm : ICONS.check; }
+        setText(li.lastChild, done[k] ? texts[k] : pending[k] + " …");
+      });
+    }
+    // The product's one admin setting: options carry value, label, sub, optional URL `param` (default: the value) and self-test `tag`.
+    const coerce = v => (SET.coerce ? SET.coerce(v) : v);
+    function setSetting(v) { v = coerce(v); setSettings({ [SET.key]: v }, `[data-${SET.dataKey || SET.attr}="${v}"]`); }
     const c = {}; // context handed to product hooks, filled once functions exist
     function snapshot() {
       const p = prompt(), d = p ? decision() : null, co = p ? H.calloutsFor(c, p, d) : [];
@@ -101,17 +118,22 @@ window.AppCore = (() => {
     function buildFlow(container) {
       for (const n of P.flowNodes) { const d = el("div", "node"); d.dataset.node = n.id; d.dataset.state = "idle"; d.append(icon(n.icon || n.id), el("span", null, n.label)); container.appendChild(d); }
     }
+    // The packet walks P.flowPath one node per scene from chat on (login shares the first node); later scenes find it all done.
     function renderFlow() {
-      const st = H.flowStates(c, sid(), state.t, prompt() ? decision() : null);
+      const id = sid(), t = state.t, path = P.flowPath, k = Math.max(0, IDX[id] - 1), st = {};
+      path.forEach((n, i) => { st[n] = k >= path.length || i < k ? "done" : i === k ? "active" : "idle"; });
+      H.flowStates(c, st, id, t, prompt() ? decision() : null);
+      if (id === "return") st[path[0]] = t >= 0.82 ? "active" : "done";
       for (const box of [flowEl, flowBig]) box.querySelectorAll(".node").forEach(n => { const v = st[n.dataset.node] || "idle"; if (n.dataset.state !== v) n.dataset.state = v; });
     }
     function renderPanel() {
       const s = sceneDef(), n = H.narration(c);
       setText(pNum, s.n); setText(pShort, s.short); setText(pTitle, s.title); setText(pLead, n.lead);
       pBullets.replaceChildren(...n.bullets.map(b => el("li", null, b)));
-      pActions.replaceChildren(...(H.panelActions ? H.panelActions(c) : []));
+      pActions.replaceChildren(...(s.id === "return" ? [button("btn btn-ghost", B.otherPrompt, () => startRun(nextUntried()))]
+        : P.adminFrom.includes(s.id) ? [button("btn btn-ghost", B.adminJump, () => goTo(IDX.admin))] : []));
       btnBack.disabled = state.scene === 0;
-      nextLabel.textContent = (P.nextLabels || {})[s.id] || "Dalej";
+      nextLabel.textContent = NEXT[s.id] || "Dalej";
       btnNext.disabled = s.id === "chat" && !state.promptId;
       inspector.hidden = !(state.scene >= IDX.send && state.scene <= IDX.return && prompt());
     }
@@ -130,7 +152,7 @@ window.AppCore = (() => {
       const key = [mv.view, mv.mode, state.promptId, state.runs.length, JSON.stringify(state.settings), state.runId].join("|");
       if (key !== state.monitorKey) {
         state.monitorKey = key; display.replaceChildren(); display.dataset.view = mv.view;
-        if (mv.view === "desktop") buildDesktop(mv.mode); else if (mv.view === "admin") display.appendChild(H.buildAdmin(c));
+        if (mv.view === "desktop") buildDesktop(mv.mode); else if (mv.view === "admin") display.appendChild(buildAdmin());
       }
       monitor.classList.toggle("show", mv.show); monitor.dataset.view = mv.view; monitor.inert = !mv.show;
       updateMonitor(mv);
@@ -169,7 +191,7 @@ window.AppCore = (() => {
     function exchange(msgs, run) {
       const p = K.promptById(run.promptId);
       const u = el("div", "bubble user"); u.append(el("span", "who", K.USER.name), document.createTextNode(p.text));
-      const ux = H.userExtra && H.userExtra(c, p); if (ux) u.appendChild(ux);
+      const ux = H.promptExtra && H.promptExtra(c, p); if (ux) u.appendChild(ux);
       const b = el("div", "bubble bot"); b.append(el("span", "who", B.name));
       H.answerBody(c, run, b);
       msgs.append(u, b);
@@ -191,7 +213,7 @@ window.AppCore = (() => {
       if (mode === "compose" && prompt()) input.textContent = prompt().text;
       const send = button("send", null, () => next()); send.append(icon("send"), document.createTextNode("Wyślij")); send.disabled = mode !== "compose" || !state.promptId; send.id = "chatSend";
       row.append(input, send); comp.append(chips);
-      const cx = mode === "compose" && prompt() && H.composeExtra ? H.composeExtra(c, prompt()) : null; if (cx) comp.appendChild(cx);
+      const cx = mode === "compose" && prompt() && H.promptExtra ? H.promptExtra(c, prompt()) : null; if (cx) comp.appendChild(cx);
       comp.appendChild(row);
       main.append(head, msgs, comp); appEl.append(chatSide(), main);
       requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
@@ -207,6 +229,27 @@ window.AppCore = (() => {
         u.classList.toggle("caret", t >= 0.6 && t < 0.73); pw.classList.toggle("caret", t >= 0.73 && t < 0.81);
         go.classList.toggle("pressed", t > 0.82 && t < 0.86); ok.classList.toggle("show", t >= 0.86);
       }
+    }
+
+    // Admin console: usage tiles + a log card (product data), the fixed rule, the setting's radio options and a rerun button.
+    function buildAdmin() {
+      const a = H.admin(c), wrap = el("div", "adm"), h = el("h3"); h.append(el("div", "kmark", B.mark), document.createTextNode(B.name + " · panel organizacji"));
+      const left = el("div"), tiles = el("div", "tiles");
+      a.tiles.forEach(([label, n, tone]) => { const tl = el("div", "tile"); tl.dataset.tone = tone; tl.append(el("b", null, String(n)), el("span", null, label)); tiles.appendChild(tl); });
+      const logCard = el("div", "card"), log = el("ul", "log");
+      logCard.append(el("h4", null, a.logTitle), log);
+      if (!a.log.length && a.logEmpty) log.appendChild(el("li", null, a.logEmpty));
+      a.log.forEach(([text, note]) => { const li = el("li"); li.append(el("span", null, text), el("em", null, note)); log.appendChild(li); });
+      left.append(el("h4", null, a.usage), tiles, logCard);
+      const right = el("div", "card"), rule = el("div", "rule"), rt = el("div");
+      rt.append(el("b", null, a.rule[0]), el("div", null, a.rule[1])); rule.append(icon("lock"), rt);
+      const opts = el("div", "opts"); opts.setAttribute("role", "radiogroup"); opts.setAttribute("aria-label", SET.label);
+      for (const o of SET.options) {
+        const b = button("opt", null, () => setSetting(o.value)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings[SET.key] === o.value)); b.dataset[SET.dataKey || SET.attr] = String(o.value);
+        const tx = el("div"); tx.append(el("b", null, o.label), el("small", null, o.sub)); b.append(el("i"), tx); opts.appendChild(b);
+      }
+      right.append(el("h4", null, a.settingsTitle), rule, ...(a.optsTitle ? [el("h4", null, a.optsTitle)] : []), opts, button("btn-admin", a.rerun[0], () => startRun(a.rerun[1])));
+      wrap.append(h, left, right); return wrap;
     }
 
     // ─── Render: final card ───
@@ -238,6 +281,7 @@ window.AppCore = (() => {
       ds.packet = done ? K.packetAt(sid(), d) : "moving"; ds.runs = String(state.runs.length);
       ds.auto = String(state.auto); ds.renderer = state.renderer; ds.reached = String(state.reached);
       if (H.contract) H.contract(c, ds, p, d);
+      ds[SET.attr] = String(coerce(state.settings[SET.key]));
       pProg.setAttribute("aria-valuenow", String(Math.round(state.t * 100)));
     }
     function renderScene() {
@@ -288,7 +332,7 @@ window.AppCore = (() => {
       if (focusSel) { const f = display.querySelector(focusSel); if (f) f.focus(); }
     }
     function restart() {
-      Object.assign(state, { promptId: null, settings: P.defaultSettings(), runSettings: null, fresh: false, runs: [], recorded: -1, reached: 0, monitorKey: "", announced: "" });
+      Object.assign(state, { promptId: null, settings: defaultSettings(), runSettings: null, fresh: false, runs: [], recorded: -1, reached: 0, monitorKey: "", announced: "" });
       if (W.resetView) W.resetView(); goTo(0);
     }
     function setAuto(on) {
@@ -318,16 +362,16 @@ window.AppCore = (() => {
         if (wi.packetNode !== expected) failures.push("world-packet:" + wi.packetNode + "≠" + expected);
         if (p && P.calloutScenes && P.calloutScenes.includes(ds.scene) && wi.callouts < 1) failures.push("world-callouts");
       }
-      if (H.probe) H.probe(c, failures, p, d, wi, done);
+      if (H.probe) H.probe(c, failures, { p, d, wi, done, ds });
       if (document.body.textContent.includes("\u2014")) failures.push("em-dash");
       return { ok: failures.length === 0, failures, scene: ds.scene, phase: ds.phase, prompt: ds.prompt, packet: ds.packet, world: wi };
     }
     async function selfTest() {
       const results = [], wait = () => new Promise(r => setTimeout(r, 30));
       const saved = { auto: state.auto }; setAuto(false);
-      const runs = H.selfTestRuns(c);
+      const runs = K.PROMPTS.flatMap(pr => SET.options.map(o => ({ promptId: pr.id, settings: { [SET.key]: o.value }, label: pr.id + (o.tag ?? "/" + o.value) })));
       for (const run of runs) {
-        state.settings = { ...P.defaultSettings(), ...run.settings }; startRun(run.promptId);
+        state.settings = { ...defaultSettings(), ...run.settings }; startRun(run.promptId);
         for (let i = IDX.chat; i <= IDX.final; i++) {
           goTo(i, { play: false }); W.frame(snapshot(), 0); await wait();
           const r = probe(); if (!r.ok) results.push(run.label + "/" + SCENES[i].id + ": " + r.failures.join(","));
@@ -362,8 +406,9 @@ window.AppCore = (() => {
           e.preventDefault();
           const radios = [...group.querySelectorAll('[role="radio"]')], step = k === "ArrowRight" || k === "ArrowDown" ? 1 : -1;
           const r = radios[(radios.indexOf(e.target) + step + radios.length) % radios.length];
-          const sel = Object.keys(r.dataset).map(key => `[data-${key.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}="${r.dataset[key]}"]`)[0];
-          r.click(); const again = sel && display.querySelector(sel); if (again) again.focus();
+          // the click rebuilds the screen: refocus the radio at the same place (group and position) in the new DOM
+          const groups = () => [...display.querySelectorAll('[role="radiogroup"]')], gi = groups().indexOf(group), ri = radios.indexOf(r);
+          r.click(); const again = gi >= 0 && groups()[gi]?.querySelectorAll('[role="radio"]')[ri]; if (again) again.focus();
           return;
         }
         if (k === "ArrowRight" || k === "PageDown" || k === " " || k.toLowerCase() === "n") { e.preventDefault(); next(); }
@@ -391,15 +436,15 @@ window.AppCore = (() => {
     }
 
     // ─── Init ───
-    Object.assign(c, { state, K, W, IDX, SCENES, ICONS, $, el, icon, button, setText, markNodes, sid, prompt, settings, decision, phase, after,
-      goTo, next, back, startRun, setSettings, restart, nextUntried, display, inspector, flowEl });
+    Object.assign(c, { state, IDX, $, el, icon, setText, markNodes, renderChecks, sid, prompt, settings, decision, after, display, inspector, flowEl });
     buildSteps(); buildFlow(flowEl); buildFlow(flowBig); bindListeners();
     W.init({
       stage, labels,
       onReady: () => { state.renderer = "webgl"; renderContract(); },
       onFail: msg => { state.renderer = "fallback"; statusEl.textContent = msg; setTimeout(() => { statusEl.textContent = ""; }, 6000); renderContract(); }
     });
-    if (H.applyParams) H.applyParams(c, PARAMS);
+    const so = SET.options.find(o => (o.param ?? o.value) === PARAMS.get(SET.param));
+    if (so) { state.settings = { ...state.settings, [SET.key]: so.value }; state.runSettings = { ...state.settings }; }
     const pr = PARAMS.get("prompt"); if (pr && K.promptById(pr)) state.promptId = pr;
     const sc = PARAMS.get("scene");
     if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) { state.reached = IDX[sc]; goTo(IDX[sc], { play: PARAMS.get("play") === "1" }); }
@@ -407,7 +452,7 @@ window.AppCore = (() => {
     // Auto is the default; deep links to a scene (presenters, tests) and ?auto=0 start step by step.
     setAuto(PARAMS.get("auto") === "1" || (PARAMS.get("auto") !== "0" && !sc && PARAMS.get("selftest") !== "1"));
     window.App = { state, probe, selfTest, goTo: id => goTo(IDX[id] ?? id, { play: false }), startRun, setSettings, next, back, restart, snapshot, world: () => W.info(),
-      ...(H.api ? H.api(c) : {}) };
+      [SET.api]: setSetting };
     requestAnimationFrame(loop);
     if (PARAMS.get("selftest") === "1") {
       const ready = () => (state.renderer !== "loading" ? selfTest() : setTimeout(ready, 100)); setTimeout(ready, 100);

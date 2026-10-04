@@ -32,7 +32,7 @@ test("routine and standard tasks stay local; complex follows policy", () => {
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "frontier" }).target, "frontier");
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "off" }).target, "local");
   assert.strictEqual(K.decide(K.promptById("complex"), { external: "bogus" }).target, "apiq", "unknown policy falls back to default");
-  assert.strictEqual(K.decide(null, K.DEFAULT_POLICY), null);
+  assert.strictEqual(K.decide(null, K.DEFAULT_SETTINGS), null);
 });
 
 test("sensitive fragments exist verbatim in their prompt text or attachment", () => {

@@ -11,9 +11,9 @@
 
   // Systems the knowledge base is synchronised with – documents stay where they are.
   const SOURCES = {
-    sharepoint: { id: "sharepoint", title: "SharePoint", tone: "srcA" },
-    onedrive: { id: "onedrive", title: "OneDrive", tone: "srcB" },
-    s3: { id: "s3", title: "Amazon S3", tone: "srcC" }
+    sharepoint: { title: "SharePoint", tone: "srcA" },
+    onedrive: { title: "OneDrive", tone: "srcB" },
+    s3: { title: "Amazon S3", tone: "srcC" }
   };
   const SOURCE_IDS = ["sharepoint", "onedrive", "s3"];
 
@@ -105,7 +105,7 @@
     const dropped = allowed.filter(c => !ranked.includes(c)).map(c => c.id);
     const outcome = prompt.covered && ranked.length ? "answer" : "nodata";
     const citations = ranked.map(c => c.id);
-    const answer = prompt.id === "restricted" && s.boardAccess && prompt.answerWithBoard ? prompt.answerWithBoard : prompt.answer;
+    const answer = s.boardAccess && prompt.answerWithBoard ? prompt.answerWithBoard : prompt.answer;
     return {
       outcome, candidates: candidates.map(c => c.id), skipped, ranked: ranked.map(c => c.id), dropped, citations, answer,
       scores: Object.fromEntries(candidates.map(c => [c.id, { semantic: c.semantic, keyword: c.keyword, score: c.score }])),
@@ -126,5 +126,5 @@
     return sc ? sc.packet : "none";
   }
 
-  root.ZaglobaData = Object.freeze({ ORG, USER, SOURCES, SOURCE_IDS, DOCS, PROMPTS, SCENES, BENEFITS, SOURCE_URL, DEFAULT_SETTINGS, RELEVANCE_MIN, TOP_K, promptById, sceneIndex, canRead, decide, packetAt });
+  root.ZaglobaData = Object.freeze({ ORG, USER, SOURCES, SOURCE_IDS, DOCS, PROMPTS, SCENES, BENEFITS, SOURCE_URL, DEFAULT_SETTINGS, RELEVANCE_MIN, TOP_K, promptById, canRead, decide, packetAt });
 })(typeof window !== "undefined" ? window : globalThis);

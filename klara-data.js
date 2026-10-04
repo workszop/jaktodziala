@@ -11,9 +11,9 @@
 
   // Where a request can be processed. `external` = leaves the organisation.
   const ROUTES = {
-    local: { id: "local", title: "Model lokalny", where: "infrastruktura organizacji", external: false, cost: "bez opłat za API" },
-    apiq: { id: "apiq", title: "Quantica APIQ", where: "modele hostowane przez Quantica", external: true, cost: "wg cennika Quantica APIQ" },
-    frontier: { id: "frontier", title: "Frontier API", where: "OpenAI · Anthropic · Gemini", external: true, cost: "wg cennika dostawcy frontier API" }
+    local: { title: "Model lokalny", where: "infrastruktura organizacji", external: false, cost: "bez opłat za API" },
+    apiq: { title: "Quantica APIQ", where: "modele hostowane przez Quantica", external: true, cost: "wg cennika Quantica APIQ" },
+    frontier: { title: "Frontier API", where: "OpenAI · Anthropic · Gemini", external: true, cost: "wg cennika dostawcy frontier API" }
   };
   const ROUTE_IDS = ["local", "apiq", "frontier"];
 
@@ -23,7 +23,7 @@
     { id: "frontier", label: "Frontier API", sub: "OpenAI · Anthropic · Gemini" },
     { id: "off", label: "Tylko modele lokalne", sub: "modele zewnętrzne wyłączone" }
   ];
-  const DEFAULT_POLICY = { external: "apiq" };
+  const DEFAULT_SETTINGS = { external: "apiq" };
 
   const COMPLEXITY = {
     routine: { label: "zadanie proste i rutynowe", needle: -0.62 },
@@ -116,7 +116,7 @@
   // Pure routing decision. Invariant: protected data never gets an external target.
   function decide(prompt, policy) {
     if (!prompt) return null;
-    const pol = policy && POLICY_OPTIONS.some(o => o.id === policy.external) ? policy : DEFAULT_POLICY;
+    const pol = policy && POLICY_OPTIONS.some(o => o.id === policy.external) ? policy : DEFAULT_SETTINGS;
     const sensitive = protectedItems(prompt);
     const fromAttachment = sensitive.some(s => s.source === "attachment");
     const level = COMPLEXITY[prompt.complexity] ? prompt.complexity : "standard";
@@ -124,15 +124,14 @@
     let target = "local", reason, badge;
     const states = { local: "faded", apiq: "faded", frontier: "faded" };
     if (sensitive.length) {
-      target = "local"; states.apiq = "blocked"; states.frontier = "blocked";
+      states.apiq = "blocked"; states.frontier = "blocked";
       reason = (fromAttachment && !prompt.sensitive.length ? "dane chronione w załączniku" : "dane chronione") + " – zadanie realizuje model lokalny, trasy zewnętrzne zablokowane";
       badge = "dane pozostają w infrastrukturze organizacji";
     } else if (level !== "high") {
-      target = "local";
       reason = "wystarczająca jakość przy niższym koszcie – model lokalny";
       badge = "efektywne wykorzystanie własnej infrastruktury";
     } else if (pol.external === "off") {
-      target = "local"; states.apiq = "off"; states.frontier = "off";
+      states.apiq = "off"; states.frontier = "off";
       reason = "polityka organizacji: modele zewnętrzne wyłączone – model lokalny";
       badge = "decyzję podejmuje polityka organizacji";
     } else {
@@ -164,5 +163,5 @@
     return s.packet;
   }
 
-  root.KlaraData = Object.freeze({ ORG, USER, ROUTES, ROUTE_IDS, POLICY_OPTIONS, DEFAULT_POLICY, COMPLEXITY, PROMPTS, SCENES, BENEFITS, SOURCE_URL, promptById, sceneIndex, protectedItems, decide, packetAt });
+  root.KlaraData = Object.freeze({ ORG, USER, ROUTES, ROUTE_IDS, POLICY_OPTIONS, DEFAULT_SETTINGS, COMPLEXITY, PROMPTS, SCENES, BENEFITS, SOURCE_URL, promptById, protectedItems, decide, packetAt });
 })(typeof window !== "undefined" ? window : globalThis);

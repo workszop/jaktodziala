@@ -1,12 +1,11 @@
 /* Klara od środka – product layer for the shared app shell (app-core.js): routing decision and policy, narration,
-   in-world callouts, packet inspector, flow, chat answers, admin panel (policy for complex tasks) and probes. */
+   in-world callouts, packet inspector, flow, chat answers, admin panel content (policy for complex tasks) and probes. */
 (() => {
   "use strict";
 
   // ─── Constants ───
   const K = window.KlaraData;
   const ROUTE_TAG = { on: "wybrana trasa", blocked: "zablokowany · dane chronione", off: "wyłączony w polityce", alt: "alternatywa", faded: "" };
-  const items = p => K.protectedItems(p);
   const ICONS = {
     scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg>',
     gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4-5"/></svg>',
@@ -16,7 +15,9 @@
   };
 
   // ─── Helpers ───
+  const items = p => K.protectedItems(p);
   const policyOf = c => c.settings().external;
+  function attChip(c, att) { const chip = c.el("div", "att"); chip.append(c.icon("clip"), c.el("b", null, att.name), c.el("small", null, att.meta)); return chip; }
   // Rule evaluation in the order the board shows it; the first rule that decides wins.
   function ruleSteps(c, p, d) {
     const prot = items(p), lv = K.COMPLEXITY[d.level].label, pol = policyOf(c);
@@ -69,18 +70,11 @@
       return out;
     },
 
-    // Packet location per scene for the schematic and the compact flow.
-    flowStates(c, id, t, d) {
-      const st = {}, o = c.IDX[id], path = ["desk", "cable", "scan", "gauge", "switch"];
-      const activeAt = { login: "desk", chat: "desk", send: "cable", scan: "scan", gauge: "gauge", route: "switch" };
-      if (activeAt[id]) { const k = path.indexOf(activeAt[id]); path.forEach((n, i) => { st[n] = i < k ? "done" : i === k ? "active" : "idle"; }); }
-      if (o >= c.IDX.model) path.forEach(n => { st[n] = "done"; });
-      if (d && (o > c.IDX.route || (id === "route" && t >= 0.7))) {
-        for (const r of K.ROUTE_IDS) { const s = d.states[r]; st[r] = s === "on" ? "chosen" : s === "faded" ? "idle" : s; }
-        if (id === "model") st[d.target] = "active";
-      }
-      if (id === "return") st.desk = t >= 0.82 ? "active" : "done";
-      return st;
+    // Flow extras on top of the core's packet path: the routes light up once the switch has decided.
+    flowStates(c, st, id, t, d) {
+      if (!d || !(c.IDX[id] > c.IDX.route || (id === "route" && t >= 0.7))) return;
+      for (const r of K.ROUTE_IDS) { const s = d.states[r]; st[r] = s === "on" ? "chosen" : s === "faded" ? "idle" : s; }
+      if (id === "model") st[d.target] = "active";
     },
 
     narration(c) {
@@ -119,16 +113,9 @@
       }
     },
 
-    panelActions(c) {
-      const id = c.sid(), out = [];
-      if (id === "return") out.push(c.button("btn btn-ghost", "Inne polecenie", () => c.startRun(c.nextUntried())));
-      if (id === "route" || id === "model") out.push(c.button("btn btn-ghost", "Zmień politykę w panelu", () => { c.state.reached = Math.max(c.state.reached, c.IDX.admin); c.goTo(c.IDX.admin); }));
-      return out;
-    },
-
     renderInspector(c) {
-      const { el, icon, $, after, markNodes, ICONS } = c, p = c.prompt(), d = c.decision();
-      const iText = $("iText"), iAtt = $("iAtt"), iChecks = $("iChecks"), iRoutes = $("iRoutes"), iMeta = $("iMeta");
+      const { el, icon, $, after, markNodes } = c, p = c.prompt(), d = c.decision();
+      const iText = $("iText"), iAtt = $("iAtt"), iRoutes = $("iRoutes"), iMeta = $("iMeta");
       const markMode = !p.sensitive.length ? "plain" : after("scan", 0.72) ? "masked" : after("scan", 0.5) ? "found" : "plain";
       if (iText.dataset.mode !== markMode || iText.dataset.prompt !== p.id) { iText.replaceChildren(markNodes(p.text, p.sensitive, markMode)); iText.dataset.mode = markMode; iText.dataset.prompt = p.id; }
       const att = p.attachment, attMode = !att ? "none" : after("scan", 0.72) ? "masked" : after("scan", 0.62) ? "found" : "plain";
@@ -139,14 +126,7 @@
         iAtt.replaceChildren(head, ...att.lines.map(line => { const row = el("div", "att-line"); row.appendChild(markNodes(line, att.sensitive.filter(it => line.includes(it.text)), attMode)); return row; }));
         iAtt.dataset.mode = attMode; iAtt.dataset.prompt = p.id;
       }
-      const done = [after("scan", 0.72), after("gauge", 0.85), after("route", 0.8)];
-      const pending = ["bezpieczeństwo danych", "stopień złożoności", "decyzja o wyborze modelu"];
-      if (!iChecks.children.length) pending.forEach(() => { const li = el("li"); li.append(el("i"), el("span")); iChecks.appendChild(li); });
-      [...iChecks.children].forEach((li, k) => {
-        const stt = !done[k] ? "pending" : k === 0 && items(p).length ? "flag" : "ok";
-        if (li.dataset.state !== stt) { li.dataset.state = stt; li.firstChild.innerHTML = stt === "pending" ? "" : stt === "flag" ? ICONS.lock.replace('width="14" height="14"', 'width="10" height="10"') : ICONS.check; }
-        const txt = done[k] ? d.checks[k] : pending[k] + " …"; if (li.lastChild.textContent !== txt) li.lastChild.textContent = txt;
-      });
+      c.renderChecks(["bezpieczeństwo danych", "stopień złożoności", "decyzja o wyborze modelu"], [after("scan", 0.72), after("gauge", 0.85), after("route", 0.8)], [items(p).length > 0], d.checks);
       if (!iRoutes.children.length) K.ROUTE_IDS.forEach(rid => { const r = el("div", "route"); r.dataset.route = rid; r.append(el("b", null, K.ROUTES[rid].title), el("span", null, K.ROUTES[rid].where), el("span", "tag")); iRoutes.appendChild(r); });
       const shown = after("route", 0.7);
       [...iRoutes.children].forEach(r => {
@@ -157,8 +137,7 @@
     },
 
     // Chat: attachments shown as chips, answers labelled with the model that handled them.
-    userExtra: (c, p) => (p.attachment ? attChip(c, p.attachment) : null),
-    composeExtra: (c, p) => (p.attachment ? attChip(c, p.attachment) : null),
+    promptExtra: (c, p) => (p.attachment ? attChip(c, p.attachment) : null),
     currentRun: (c, d) => ({ target: d.target, badge: d.badge, sensitive: items(c.prompt()).length > 0, attachment: !!c.prompt().attachment }),
     answerBody(c, run, bubble) {
       const p = K.promptById(run.promptId), r = K.ROUTES[run.target];
@@ -168,41 +147,25 @@
     announce: (c, p, d) => "Odpowiedź Klary (" + K.ROUTES[d.target].title.toLowerCase() + "): " + p.answer,
     runLine: (c, r) => [K.promptById(r.promptId).label + (r.target !== "local" ? " · polityka: " + K.POLICY_OPTIONS.find(o => o.id === r.settings.external).label : ""), K.ROUTES[r.target].title],
 
-    buildAdmin(c) {
-      const { el, icon, button, state } = c;
-      const wrap = el("div", "adm"), h = el("h3"); h.append(el("div", "kmark", "K"), document.createTextNode("Klara · panel organizacji"));
-      const runs = state.runs, count = id => runs.filter(r => r.target === id).length;
-      const left = el("div"), tiles = el("div", "tiles");
-      [["Zapytania", runs.length, ""], ["Model lokalny", count("local"), "ok"], ["Quantica APIQ", count("apiq"), "admin"], ["Frontier API", count("frontier"), "admin"],
-        ["Zablokowane wyjścia danych chronionych", runs.filter(r => r.sensitive).length, "danger"], ["Wywołania płatnych API", count("apiq") + count("frontier"), ""]]
-        .forEach(([label, n, tone]) => { const tl = el("div", "tile"); tl.dataset.tone = tone; tl.append(el("b", null, String(n)), el("span", null, label)); tiles.appendChild(tl); });
-      const logCard = el("div", "card"), log = el("ul", "log");
-      logCard.append(el("h4", null, "Ostatnie zapytania (ta sesja demo)"), log);
-      if (!runs.length) log.appendChild(el("li", null, "Brak zapytań – wyślij polecenie z okna czatu."));
-      runs.slice().reverse().forEach(r => { const li = el("li"); li.append(el("span", null, K.promptById(r.promptId).label), el("em", null, K.ROUTES[r.target].title)); log.appendChild(li); });
-      left.append(el("h4", null, "Wykorzystanie modeli"), tiles, logCard);
-      const right = el("div", "card"), rule = el("div", "rule"), rt = el("div");
-      rt.append(el("b", null, "Dane chronione → tylko model lokalny"), el("div", null, "Reguła stała: dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."));
-      rule.append(icon("lock"), rt);
-      const opts = el("div", "opts"); opts.setAttribute("role", "radiogroup"); opts.setAttribute("aria-label", "Model zewnętrzny dla zadań złożonych");
-      for (const o of K.POLICY_OPTIONS) {
-        const b = button("opt", null, () => c.setSettings({ external: o.id }, `[data-policy="${o.id}"]`)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings.external === o.id)); b.dataset.policy = o.id;
-        const tx = el("div"); tx.append(el("b", null, o.label), el("small", null, o.sub)); b.append(el("i"), tx); opts.appendChild(b);
-      }
-      const rerun = button("btn-admin", "Sprawdź na zadaniu złożonym", () => c.startRun("complex"));
-      right.append(el("h4", null, "Reguły kierowania zapytań"), rule, el("h4", null, "Zadania złożone na danych publicznych"), opts, rerun);
-      wrap.append(h, left, right); return wrap;
+    // Admin console content; the core builds the panel around it with the policy options.
+    admin(c) {
+      const runs = c.state.runs, count = id => runs.filter(r => r.target === id).length;
+      return {
+        usage: "Wykorzystanie modeli",
+        tiles: [["Zapytania", runs.length, ""], ["Model lokalny", count("local"), "ok"], ["Quantica APIQ", count("apiq"), "admin"], ["Frontier API", count("frontier"), "admin"],
+          ["Zablokowane wyjścia danych chronionych", runs.filter(r => r.sensitive).length, "danger"], ["Wywołania płatnych API", count("apiq") + count("frontier"), ""]],
+        logTitle: "Ostatnie zapytania (ta sesja demo)", logEmpty: "Brak zapytań – wyślij polecenie z okna czatu.",
+        log: runs.slice().reverse().map(r => [K.promptById(r.promptId).label, K.ROUTES[r.target].title]),
+        settingsTitle: "Reguły kierowania zapytań", optsTitle: "Zadania złożone na danych publicznych",
+        rule: ["Dane chronione → tylko model lokalny", "Reguła stała: dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."],
+        rerun: ["Sprawdź na zadaniu złożonym", "complex"]
+      };
     },
 
-    contract(c, ds, p, d) { ds.route = d ? d.target : ""; ds.policy = c.state.settings.external; },
-    applyParams(c, params) {
-      const pol = params.get("policy");
-      if (pol && K.POLICY_OPTIONS.some(o => o.id === pol)) { c.state.settings = { external: pol }; c.state.runSettings = { external: pol }; }
-    },
-    api: c => ({ setPolicy: id => c.setSettings({ external: id }, `[data-policy="${id}"]`) }),
+    contract(c, ds, p, d) { ds.route = d ? d.target : ""; },
 
-    probe(c, failures, p, d, wi, done) {
-      const { $, IDX, state, after, inspector, flowEl } = c, ds = document.getElementById("app").dataset;
+    probe(c, failures, { p, d, wi, done, ds }) {
+      const { $, IDX, state, after, inspector, flowEl } = c;
       if (p && ds.route !== d.target) failures.push("route-contract");
       if (p && items(p).length && ds.route !== "local") failures.push("privacy-route");
       if (p && items(p).length) $("iRoutes").querySelectorAll('[data-route="apiq"],[data-route="frontier"]').forEach(r => { if (r.dataset.state === "on") failures.push("privacy-card"); });
@@ -225,12 +188,10 @@
         if (ds.scene === "model" && !d.external && wi.blade !== 0) failures.push("world-blade-left-open");
       }
     },
-    selfTestRuns: () => K.PROMPTS.flatMap(pr => K.POLICY_OPTIONS.map(pol => ({ promptId: pr.id, settings: { external: pol.id }, label: pr.id + "/" + pol.id }))),
     selfTestCheck(c, results) {
       c.state.runs.forEach(r => { const d = K.decide(K.promptById(r.promptId), r.settings); if (d.target !== r.target) results.push("run-target:" + r.promptId + "/" + r.settings.external); if (r.sensitive && r.target !== "local") results.push("run-privacy"); });
     }
   };
-  function attChip(c, att) { const chip = c.el("div", "att"); chip.append(c.icon("clip"), c.el("b", null, att.name), c.el("small", null, att.meta)); return chip; }
 
   // ─── Init ───
   window.KlaraWorld = window.WorldCore.create(window.KlaraStations);
@@ -241,19 +202,22 @@
       hello: "Dzień dobry! W czym mogę pomóc? Model dopasuję do zadania automatycznie.", history: ["Plan szkoleń na IV kwartał", "Podsumowanie spotkania działu"],
       chipsLabel: "Przykładowe polecenia", placeholder: "Wybierz przykładowe polecenie powyżej…", placeholderNext: "Wybierz kolejne polecenie powyżej…",
       finalTitle: "Klara od środka – podsumowanie", finalSub: "Jedno okno czatu dla pracownika. Pełna kontrola nad danymi, modelami i kosztami po stronie organizacji.",
-      tryAnother: "Wypróbuj inne polecenie", adminAction: "Zmień politykę organizacji", sibling: { label: "Zobacz też: Zagłoba od środka", href: "zagloba.html" }
+      tryAnother: "Wypróbuj inne polecenie", adminAction: "Zmień politykę organizacji", otherPrompt: "Inne polecenie", adminJump: "Zmień politykę w panelu", sibling: { label: "Zobacz też: Zagłoba od środka", href: "zagloba.html" }
     },
     autoOrder: ["sensitive", "routine", "complex", "attachment"],
     dwell: { scan: 4.5, route: 4.5 },
     calloutScenes: ["scan", "gauge", "route", "model"],
-    nextLabels: { chat: "Wyślij do Klary", send: "Zajrzyj do środka", return: "Panel organizacji", admin: "Podsumowanie", final: "Zacznij od nowa" },
+    // the admin panel's one setting: policy for complex tasks (?policy=<id>, App.setPolicy, data-policy)
+    setting: { key: "external", param: "policy", attr: "policy", api: "setPolicy", label: "Model zewnętrzny dla zadań złożonych",
+      options: K.POLICY_OPTIONS.map(o => ({ value: o.id, label: o.label, sub: o.sub })) },
+    adminFrom: ["route", "model"],
+    nextLabels: { chat: "Wyślij do Klary" },
     flowNodes: [
       { id: "desk", label: "Stanowisko" }, { id: "cable", label: "Kabel do serwera" }, { id: "scan", label: "Skaner" },
       { id: "gauge", label: "Miernik złożoności" }, { id: "switch", label: "Zwrotnica" }, { id: "local", label: "Model lokalny" },
       { id: "apiq", label: "Quantica APIQ" }, { id: "frontier", label: "Frontier API" }
     ],
-    defaultSettings: () => ({ ...K.DEFAULT_POLICY }),
-    decide: (p, s) => K.decide(p, s),
+    flowPath: ["desk", "cable", "scan", "gauge", "switch"],
     hooks
   });
 })();
