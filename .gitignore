@@ -22,6 +22,7 @@ klara-journey/
 # ─── Tooling / OS ───
 node_modules/
 test-results/
+tests/.cache/
 playwright-report/
 *.log
 .DS_Store

@@ -67,15 +67,20 @@ Invariant: a document the user cannot read is never cited (`tests/zagloba.cjs` +
 - `index.html` – the home page (`#home` gets `data-ready="true"` once its script has run): a choice between the two journeys, each shown as a still of its 3D server interior (`assets/home/klara.webp` = `klara.html?scene=route&prompt=sensitive`, `assets/home/zagloba.webp` = `zagloba.html?scene=rank&prompt=procedure`; `#stage` captured at 2× with labels hidden, saved as 1600 px WebP).
 - `klara.html` / `zagloba.html` – each product's shell with its accent and world tokens (`--world-*` drive the 3D colours).
 - `assets/brand/` – favicon and the Quantica logo; `assets/home/` – the two home page stills.
-- `tests/` – `harness.cjs` (sandbox loader, `test()`, the em-dash scan over every shipped text file, run from `route.cjs`), `route.cjs` (Klara's routing), `zagloba.cjs` (Zagłoba's retrieval), `browser.mjs` (headless Chrome: home page, both apps, self-tests, keyboard playthroughs, phone width, the schematic fallback).
+- `tests/` – `harness.cjs` (sandbox loader, `test()`, the em-dash scan over every shipped text file, run from `route.cjs`), `route.cjs` (Klara's routing), `zagloba.cjs` (Zagłoba's retrieval), `browser.mjs` (headless Chrome: home page, both apps, self-tests, keyboard playthroughs, phone width, the schematic fallback; `--only=` sections), `quick.sh` (the quick tier).
 
 ## Verify
 
+Two tiers. Pick the smallest that covers the change: a text, style or one-product tweak rarely needs the full suite.
+
 ```sh
-node tests/route.cjs
-node tests/zagloba.cjs
-PLAYWRIGHT_MODULE=/abs/path/playwright/index.mjs CHROME_PATH=/usr/bin/google-chrome node tests/browser.mjs
+export PLAYWRIGHT_MODULE=/abs/path/playwright/index.mjs CHROME_PATH=/usr/bin/google-chrome
+tests/quick.sh                                  # ~30 s: syntax, Node tests, browser smoke (both apps load, wait at Start, Start moves the robot)
+node tests/browser.mjs                          # full suite, prints the time per section
+node tests/browser.mjs --only=klara             # one area: home, klara, zagloba (comma-separated), or smoke
 ```
+
+The browser suite serves three.js and the fonts from `tests/.cache/` (filled on the first run, git-ignored), so it needs the network only once. Playthroughs run at `?speed=4`; only Auto's first scene runs in real time.
 
 **DOM contract** on `#app` (both apps): `data-scene`, `data-phase` (`idle` at the start, then `playing` / `done`), `data-prompt`, `data-packet` (expected packet location, `moving` while a scene plays), `data-world-packet` (actual, from the 3D world) and `data-world-robot` (`waiting` / `walking` / `desk`; both only with WebGL), `data-auto` (`true` / `false`), `data-renderer` (`loading` / `webgl` / `fallback`), `data-runs` (runs logged), `data-reached` (furthest scene index unlocked in the stepper), and after a self-test `data-test` (`pass` / `fail`) with `data-test-detail`. Product-specific: Klara `data-route` (`local` / `apiq` / `frontier`) and `data-policy`; Zagłoba `data-board-access` (`true` / `false`), `data-outcome` (`answer` / `nodata`), `data-cited` and `data-skipped` (document ids, comma-separated).
 
