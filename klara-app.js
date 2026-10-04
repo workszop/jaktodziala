@@ -4,7 +4,7 @@
   "use strict";
 
   // ─── Constants ───
-  const K = window.KlaraData;
+  const K = window.KlaraData, SCAN_T = K.SCAN_T;
   const ROUTE_TAG = { on: "wybrana trasa", blocked: "zablokowany · dane chronione", off: "wyłączony w polityce", alt: "alternatywa", faded: "" };
   const ICONS = {
     scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg>',
@@ -37,15 +37,15 @@
     // In-world explanation cards, anchored by the 3D world to its stations.
     calloutsFor(c, p, d) {
       const id = c.sid(), t = c.state.t, out = [], prot = d.protectedCount, own = p.sensitive, att = p.attachment, attItems = att ? att.sensitive : [];
-      const found = (it, maskAt) => ({ text: t > maskAt ? it.kind + " → " + it.token : it.kind + ": wykryto", state: t > maskAt ? "ok" : "flag" });
+      const found = it => ({ text: t > SCAN_T.masked ? it.kind + " → " + it.token : it.kind + ": wykryto", state: t > SCAN_T.masked ? "ok" : "flag" });
       if (id === "send" && t > 0.85) out.push({ id: "server", anchor: "server", side: "top", tone: "brand", kicker: "Quantica AI Server", title: "Decyzja zapada w organizacji",
         lines: [{ text: "polecenie dotarło do serwera organizacji", state: "ok" }, { text: "nic nie wychodzi na zewnątrz przed analizą", state: "on" }] });
       if (id === "scan") {
-        if (att && t > 0.5) out.push({ id: "monitor", anchor: "monitor", side: "left", tone: "scan", kicker: "Rentgen załącznika", title: att.name,
-          lines: [{ text: att.meta, state: "muted" }, { text: t > 0.58 ? "przeczytano wszystkie strony" : "odczyt stron…", state: t > 0.58 ? "ok" : "muted" }, ...(t > 0.62 ? attItems.map(it => found(it, 0.72)) : [])] });
-        if (t > 0.5) out.push({ id: "scan", anchor: "scan", side: "left", tone: "scan", kicker: "Krok 1 · Skaner", title: "Bezpieczeństwo danych",
-          lines: [...(own.length ? own.map(it => found(it, 0.72)) : [{ text: "treść polecenia: brak danych chronionych", state: "ok" }]),
-            ...(att ? [{ text: t > 0.62 ? "załącznik: " + attItems.length + " fragmenty chronione" : "załącznik: analiza…", state: t > 0.62 ? "flag" : "muted" }] : []),
+        if (att && t > SCAN_T.found) out.push({ id: "monitor", anchor: "monitor", side: "left", tone: "scan", kicker: "Rentgen załącznika", title: att.name,
+          lines: [{ text: att.meta, state: "muted" }, { text: t > 0.58 ? "przeczytano wszystkie strony" : "odczyt stron…", state: t > 0.58 ? "ok" : "muted" }, ...(t > SCAN_T.read ? attItems.map(found) : [])] });
+        if (t > SCAN_T.found) out.push({ id: "scan", anchor: "scan", side: "left", tone: "scan", kicker: "Krok 1 · Skaner", title: "Bezpieczeństwo danych",
+          lines: [...(own.length ? own.map(found) : [{ text: "treść polecenia: brak danych chronionych", state: "ok" }]),
+            ...(att ? [{ text: t > SCAN_T.read ? "załącznik: " + attItems.length + " fragmenty chronione" : "załącznik: analiza…", state: t > SCAN_T.read ? "flag" : "muted" }] : []),
             ...(t > 0.78 ? [prot ? { text: "pakiet oznaczony: zakaz wyjścia poza organizację", state: "flag" } : { text: "pakiet może wyjść poza organizację, jeśli wymaga tego zadanie", state: "ok" }] : [])] });
       }
       if (id === "gauge" && t > 0.35) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "accent", kicker: "Krok 2 · Miernik złożoności",
@@ -116,9 +116,9 @@
     renderInspector(c) {
       const { el, icon, $, after, markNodes } = c, p = c.prompt(), d = c.decision();
       const iText = $("iText"), iAtt = $("iAtt"), iRoutes = $("iRoutes"), iMeta = $("iMeta");
-      const markMode = !p.sensitive.length ? "plain" : after("scan", 0.72) ? "masked" : after("scan", 0.5) ? "found" : "plain";
+      const markMode = !p.sensitive.length ? "plain" : after("scan", SCAN_T.masked) ? "masked" : after("scan", SCAN_T.found) ? "found" : "plain";
       if (iText.dataset.mode !== markMode || iText.dataset.prompt !== p.id) { iText.replaceChildren(markNodes(p.text, p.sensitive, markMode)); iText.dataset.mode = markMode; iText.dataset.prompt = p.id; }
-      const att = p.attachment, attMode = !att ? "none" : after("scan", 0.72) ? "masked" : after("scan", 0.62) ? "found" : "plain";
+      const att = p.attachment, attMode = !att ? "none" : after("scan", SCAN_T.masked) ? "masked" : after("scan", SCAN_T.read) ? "found" : "plain";
       iAtt.hidden = !att;
       if (!att && iAtt.dataset.prompt) { iAtt.replaceChildren(); iAtt.dataset.mode = iAtt.dataset.prompt = ""; }
       if (att && (iAtt.dataset.mode !== attMode || iAtt.dataset.prompt !== p.id)) {
@@ -126,7 +126,7 @@
         iAtt.replaceChildren(head, ...att.lines.map(line => { const row = el("div", "att-line"); row.appendChild(markNodes(line, att.sensitive.filter(it => line.includes(it.text)), attMode)); return row; }));
         iAtt.dataset.mode = attMode; iAtt.dataset.prompt = p.id;
       }
-      c.renderChecks(["bezpieczeństwo danych", "stopień złożoności", "decyzja o wyborze modelu"], [after("scan", 0.72), after("gauge", 0.85), after("route", 0.8)], [d.protectedCount > 0], d.checks);
+      c.renderChecks(["bezpieczeństwo danych", "stopień złożoności", "decyzja o wyborze modelu"], [after("scan", SCAN_T.masked), after("gauge", 0.85), after("route", 0.8)], [d.protectedCount > 0], d.checks);
       if (!iRoutes.children.length) K.ROUTE_IDS.forEach(rid => { const r = el("div", "route"); r.dataset.route = rid; r.append(el("b", null, K.ROUTES[rid].title), el("span", null, K.ROUTES[rid].where), el("span", "tag")); iRoutes.appendChild(r); });
       const shown = after("route", 0.7);
       [...iRoutes.children].forEach(r => {
@@ -175,7 +175,7 @@
         const chosen = [...flowEl.querySelectorAll('[data-state="chosen"],[data-state="active"]')].map(n => n.dataset.node).filter(n => K.ROUTE_IDS.includes(n));
         if (chosen.length !== 1 || chosen[0] !== d.target) failures.push("flow-target");
       }
-      if (!inspector.hidden && after("scan", 0.72) && prot) {
+      if (!inspector.hidden && after("scan", SCAN_T.masked) && prot) {
         const marks = inspector.querySelectorAll("mark.pii");
         if (marks.length !== prot || [...marks].some(m => m.dataset.masked !== "true")) failures.push("mask-contract");
         if (items(p).some(s => ($("iText").textContent + $("iAtt").textContent).includes(s.text))) failures.push("mask-leak");

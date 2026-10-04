@@ -1,5 +1,5 @@
 // Shared harness for the Node checks (route.cjs, zagloba.cjs): loads a classic-script data file into a sandbox,
-// runs named tests and scans every shipped text file for em-dashes.
+// runs named tests and scans every shipped text file for em-dashes (testNoEmDashes, run once, from route.cjs).
 "use strict";
 const fs = require("fs"), path = require("path"), vm = require("vm"), assert = require("assert");
 
@@ -17,18 +17,15 @@ function load(file, globalName) {
 function test(name, fn) { fn(); passed++; console.log("ok  " + name); }
 
 // Every text file the site ships: the pages, the scripts at the root, the stylesheet and the README.
-// EM_DASH_ROOT points the scan at another folder (to prove the check bites without touching the repo).
-function shippedTextFiles(root = process.env.EM_DASH_ROOT || ROOT) {
-  return fs.readdirSync(root).filter(f => /\.(html|js)$/.test(f) || f === "app.css" || f === "README.md").sort().map(f => path.join(root, f));
-}
+const SHIPPED_KNOWN = ["index.html", "klara.html", "zagloba.html", "app.css", "README.md", "app-core.js", "world-core.js"];
+const shippedTextFiles = () => fs.readdirSync(ROOT).filter(f => /\.(html|js)$/.test(f) || f === "app.css" || f === "README.md").sort();
 
 function testNoEmDashes() {
   test("no em-dashes in any shipped text file", () => {
     const files = shippedTextFiles();
-    assert.ok(files.length > 0, "no files to scan");
-    const hits = files.filter(f => fs.readFileSync(f, "utf8").includes(EM_DASH));
-    assert.deepStrictEqual(hits.map(f => path.basename(f)), [], "em-dash found");
-    if (process.env.EM_DASH_LIST) console.log("    scanned: " + files.map(f => path.basename(f)).join(" "));
+    for (const f of SHIPPED_KNOWN) assert.ok(files.includes(f), "not scanned: " + f);
+    const hits = files.filter(f => fs.readFileSync(path.join(ROOT, f), "utf8").includes(EM_DASH));
+    assert.deepStrictEqual(hits, [], "em-dash found");
   });
 }
 

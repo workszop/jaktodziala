@@ -29,11 +29,13 @@ window.AppCore = (() => {
 
   function start(P) {
     const K = P.data, W = P.world, B = P.brand, H = P.hooks, SET = P.setting;
-    const defaultSettings = () => ({ ...K.DEFAULT_SETTINGS });
     const SCENES = K.SCENES, IDX = Object.fromEntries(SCENES.map((s, i) => [s.id, i]));
     const ICONS = { ...BASE_ICONS, ...(P.icons || {}) };
     const AUTO_ORDER = P.autoOrder, DWELL = { login: 2.4, admin: 6, final: 9, default: 3.4, ...(P.dwell || {}) }, NEXT = { ...NEXT_LABELS, ...(P.nextLabels || {}) };
     const PARAMS = new URLSearchParams(location.search);
+    // the setting from the URL (?policy= / ?access=) is the starting point of every simulation: on load, after a restart, in the self-test
+    const URL_SETTING = SET.options.find(o => (o.param ?? o.value) === PARAMS.get(SET.param));
+    const defaultSettings = () => ({ ...K.DEFAULT_SETTINGS, ...(URL_SETTING ? { [SET.key]: URL_SETTING.value } : {}) });
     const SPEED = Math.min(4, Math.max(0.25, parseFloat(PARAMS.get("speed")) || 1));
     const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -66,6 +68,8 @@ window.AppCore = (() => {
     function icon(name, cls) { const s = el("span", cls); s.innerHTML = ICONS[name] || ""; s.setAttribute("aria-hidden", "true"); return s; }
     function button(cls, text, onClick) { const b = el("button", cls, text); b.type = "button"; b.addEventListener("click", onClick); return b; }
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+    // a control that went away: detached, inert, disabled or hidden (Start once pressed)
+    const gone = e => !e.isConnected || e.closest("[inert]") || e.disabled || e.hidden || e.checkVisibility?.() === false;
     const nextUntried = () => {
       const tried = new Set(state.runs.map(r => r.promptId)); if (state.promptId) tried.add(state.promptId);
       return AUTO_ORDER.find(id => !tried.has(id)) || AUTO_ORDER[(AUTO_ORDER.indexOf(state.promptId) + 1) % AUTO_ORDER.length];
@@ -95,7 +99,7 @@ window.AppCore = (() => {
     }
     // The product's one admin setting: options carry value, label, sub, optional URL `param` (default: the value) and self-test `tag`.
     // App.<api>(v) resolves v through the declared options ("false" is the option false); an unknown value is ignored.
-    function setSetting(v) { const o = SET.options.find(x => String(x.value) === String(v)); if (o) setSettings({ [SET.key]: o.value }, `.opt[data-value="${o.value}"]`); }
+    function setSetting(v) { const o = SET.options.find(x => String(x.value) === String(v)); if (o) setSettings({ [SET.key]: o.value }); }
     const c = {}; // context handed to product hooks, filled once functions exist
     function snapshot() {
       const p = prompt(), d = p ? decision() : null, co = p ? H.calloutsFor(c, p, d) : [];
@@ -249,7 +253,8 @@ window.AppCore = (() => {
       rt.append(el("b", null, a.rule[0]), el("div", null, a.rule[1])); rule.append(icon("lock"), rt);
       const opts = el("div", "opts"); opts.setAttribute("role", "radiogroup"); opts.setAttribute("aria-label", SET.label);
       for (const o of SET.options) {
-        const b = button("opt", null, () => setSetting(o.value)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings[SET.key] === o.value)); b.dataset.value = String(o.value);
+        // the click rebuilds the panel: focus returns to the chosen option (the API setter leaves focus alone)
+        const b = button("opt", null, () => { setSetting(o.value); display.querySelector(`.opt[data-value="${o.value}"]`)?.focus(); }); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings[SET.key] === o.value)); b.dataset.value = String(o.value);
         const tx = el("div"); tx.append(el("b", null, o.label), el("small", null, o.sub)); b.append(el("i"), tx); opts.appendChild(b);
       }
       right.append(el("h4", null, a.settingsTitle), rule, ...(a.optsTitle ? [el("h4", null, a.optsTitle)] : []), opts, button("btn-admin", a.rerun[0], () => startRun(a.rerun[1])));
@@ -282,7 +287,7 @@ window.AppCore = (() => {
     function renderContract() {
       const p = prompt(), d = p ? decision() : null, ds = app.dataset;
       ds.scene = sid(); ds.phase = state.phase; ds.prompt = p ? p.id : "";
-      ds.packet = state.phase === "done" ? K.packetAt(sid(), d) : "moving"; ds.runs = String(state.runs.length);
+      ds.packet = state.phase === "playing" ? "moving" : K.packetAt(sid(), d); ds.runs = String(state.runs.length);
       ds.auto = String(state.auto); ds.renderer = state.renderer; ds.reached = String(state.reached);
       if (H.contract) H.contract(c, ds, p, d);
       ds[SET.attr] = String(state.settings[SET.key]);
@@ -291,8 +296,8 @@ window.AppCore = (() => {
     function renderScene() {
       const had = document.activeElement, focused = had && had !== document.body;
       renderSteps(); renderPanel(); state.progressKey = ""; onProgress();
-      // focus on a control that went away (detached, inert, disabled or hidden – Start once pressed) moves to the main one
-      if (focused && (!had.isConnected || had.closest("[inert]") || had.disabled || had.hidden || had.checkVisibility?.() === false)) (state.phase === "idle" ? btnStart : btnNext).focus({ preventScroll: true });
+      // focus on a control that went away moves to the main one still there: Start, Dalej, or the first prompt chip (chat without a prompt)
+      if (focused && gone(had)) [btnStart, btnNext, display.querySelector('[role="radio"]')].find(e => e && !gone(e))?.focus({ preventScroll: true });
     }
     function onProgress() {
       pProg.firstChild.style.width = (state.t * 100).toFixed(1) + "%";
@@ -312,13 +317,14 @@ window.AppCore = (() => {
       state.reached = Math.max(state.reached, state.scene);
       state.t = idle || (play && !REDUCED) ? 0 : 1; state.phase = idle ? "idle" : state.t < 1 ? "playing" : "done"; state.dwell = 0;
       if (sid() === "send" && state.newRun) { state.runId++; state.newRun = false; state.reached = IDX.send; state.runSettings = { ...state.settings }; }
-      renderScene(); if (state.phase === "done") sceneDone();
+      if (state.phase === "done") sceneDone();
+      renderScene();
     }
     // Start: the robot walks to the computer and logs in (Auto, if on, carries on from there)
     function begin() { if (state.phase === "idle") goTo(state.scene); }
     function next() {
       if (state.phase === "idle") { begin(); return; }
-      if (state.phase === "playing") { state.t = 1; state.phase = "done"; onProgress(); sceneDone(); return; }
+      if (state.phase === "playing") { state.t = 1; state.phase = "done"; sceneDone(); onProgress(); return; }
       if (sid() === "chat" && !state.promptId) return;
       if (sid() === "final") { restart(); return; }
       goTo(state.scene + 1);
@@ -329,19 +335,17 @@ window.AppCore = (() => {
       state.runs.push({ runId: state.runId, promptId: state.promptId, settings: { ...settings() }, ...H.currentRun(c, decision()) });
       state.monitorKey = "";
     }
-    function sceneDone() { if (sid() === "return") recordRun(); state.progressKey = ""; onProgress(); }
+    // a scene reached its end (the caller renders it): the answer scene logs the run
+    function sceneDone() { if (sid() === "return") recordRun(); }
     // a chosen prompt opens a new run, logged once it has been sent; the stepper ends at the chat until then
-    function setPrompt(id) { state.promptId = id; state.newRun = true; state.reached = IDX.chat; }
+    function setPrompt(id) { state.promptId = id; state.newRun = true; state.reached = IDX.chat; state.announced = ""; }
     function choosePrompt(id) {
       if (sid() !== "chat" || !K.promptById(id)) return;
       setPrompt(id); state.monitorKey = ""; renderScene();
       const send = $("chatSend"); if (send && !state.auto) send.focus();
     }
-    function startRun(id) { if (sid() === "return") recordRun(); setPrompt(id); goTo(IDX.chat); }
-    function setSettings(patch, focusSel) {
-      state.settings = { ...state.settings, ...patch }; state.monitorKey = ""; renderScene();
-      if (focusSel) { const f = display.querySelector(focusSel); if (f) f.focus(); }
-    }
+    function startRun(id) { if (!K.promptById(id)) return; if (sid() === "return") recordRun(); setPrompt(id); goTo(IDX.chat); }
+    function setSettings(patch) { state.settings = { ...state.settings, ...patch }; state.monitorKey = ""; renderScene(); }
     function restart() {
       Object.assign(state, { promptId: null, settings: defaultSettings(), runSettings: null, newRun: false, runs: [], reached: 0, monitorKey: "", announced: "" });
       if (W.resetView) W.resetView(); goTo(0, { idle: true });
@@ -457,16 +461,15 @@ window.AppCore = (() => {
       onReady: () => { state.renderer = "webgl"; renderContract(); },
       onFail: msg => { state.renderer = "fallback"; statusEl.textContent = msg; setTimeout(() => { statusEl.textContent = ""; }, 6000); renderContract(); }
     });
-    const so = SET.options.find(o => (o.param ?? o.value) === PARAMS.get(SET.param));
-    if (so) { state.settings = { ...state.settings, [SET.key]: so.value }; state.runSettings = { ...state.settings }; }
     const pr = PARAMS.get("prompt"), sc = PARAMS.get("scene");
-    // a preset prompt that is still to be sent (no scene, or up to the chat) is a new run, logged like a chosen one
-    if (pr && K.promptById(pr)) { state.promptId = pr; state.newRun = !sc || IDX[sc] == null || IDX[sc] <= IDX.chat; }
+    // a preset prompt that is still to be sent (no scene, or up to the chat) is a new run, logged like a chosen one;
+    // a preset run keeps the settings it starts with (a later change in the admin panel applies to the next run)
+    if (pr && K.promptById(pr)) { state.promptId = pr; state.newRun = !sc || IDX[sc] == null || IDX[sc] <= IDX.chat; state.runSettings = { ...state.settings }; }
     if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) goTo(IDX[sc], { play: PARAMS.get("play") === "1" });
     else goTo(0, { idle: true });
     // Auto is the default; deep links to a scene (presenters, tests) and ?auto=0 start step by step.
     setAuto(PARAMS.get("auto") === "1" || (PARAMS.get("auto") !== "0" && !sc && PARAMS.get("selftest") !== "1"));
-    window.App = { state, probe, selfTest, goTo: id => goTo(IDX[id] ?? id, { play: false }), start: begin, startRun, setSettings, next, back, restart, snapshot, world: () => W.info(),
+    window.App = { state, probe, selfTest, goTo: id => { const i = IDX[id] ?? id; if (SCENES[i]) goTo(i, { play: false }); }, start: begin, startRun, setSettings, next, back, restart, snapshot, world: () => W.info(),
       [SET.api]: setSetting };
     requestAnimationFrame(loop);
     if (PARAMS.get("selftest") === "1") {

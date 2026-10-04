@@ -1,6 +1,6 @@
 // Deterministic checks for Zagłoba's retrieval decision and data. Run: node tests/zagloba.cjs
 "use strict";
-const { assert, load, test, testNoEmDashes, finish } = require("./harness.cjs");
+const { assert, load, test, finish } = require("./harness.cjs");
 const Z = load("zagloba-data.js", "ZaglobaData");
 const SETTINGS = [{ boardAccess: false }, { boardAccess: true }];
 
@@ -55,5 +55,4 @@ test("scenes and documents are consistent", () => {
   assert.strictEqual(Z.packetAt("model"), "local"); assert.strictEqual(Z.packetAt("nope"), "none");
 });
 
-testNoEmDashes();
 finish();

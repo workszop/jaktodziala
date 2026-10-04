@@ -148,7 +148,7 @@ window.ZaglobaStations = {
         c.fillStyle = r.state === "skipped" ? colors.danger : colors.paper; c.font = font(700, 22, true); c.fillText(r.rank ? String(r.rank) : "·", cols[0], y);
         c.font = font(500, 21, true); c.fillText(r.title.length > 32 ? r.title.slice(0, 31) + "…" : r.title, cols[1], y);
         c.fillStyle = colors[SRC_TONE[r.source]]; c.fillRect(cols[2], y - 18, 14, 22); c.fillStyle = colors.paper; c.fillText(Z.SOURCES[r.source].title, cols[2] + 22, y);
-        if (r.scored) { c.fillText(String(Math.round(r.semantic * 100)), cols[3], y); c.fillText(String(Math.round(r.keyword * 100)), cols[4], y); }
+        c.fillText(String(Math.round(r.semantic * 100)), cols[3], y); c.fillText(String(Math.round(r.keyword * 100)), cols[4], y);
         if (r.access) { c.fillStyle = r.access === "ok" ? colors.ok : colors.danger; c.font = font(700, 21, true); c.fillText(r.access === "ok" ? "tak" : "BRAK", cols[5], y); }
         c.globalAlpha = 1;
       });
@@ -200,7 +200,6 @@ window.ZaglobaStations = {
       buildIndex(); buildCards(); buildSearch(); buildGate(); buildPodium(); buildConnectors();
       refs.drawMonitor = k.rackScreen(SEARCH[0] - 0.02, "PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", drawMonitor);
       buildPipes();
-      refs.blades = k.localBay();
       k.plates([[9.2, "1", "WYSZUKIWANIE", "accent"], [10.05, "2", "UPRAWNIENIA", "admin"], [10.9, "3", "TRAFNOŚĆ", "accent"], [12.25, "4", "MODEL LOKALNY", "ok"]]);
     }
 
@@ -214,14 +213,13 @@ window.ZaglobaStations = {
     // ─── Pose ───
     function cardPlan(s, d, sheetX) {
       // Where every candidate card is in this scene and moment; non-candidates stay in their shelf slots.
-      const id = s.sceneId, t = s.t, plan = {}, cand = d ? d.candidates : [], n = cand.length;
+      const id = s.sceneId, t = s.t, plan = {}, cand = d.candidates, n = cand.length;
       const stage = (i, x) => v3([x + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]);
       const tray = i => v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); // a skipped card's place in the tray, the same in every scene
       const slot = cid => v3(refs.slots[cid]);
-      const rankIdx = cid => (d ? d.ranked.indexOf(cid) : -1);
       const podiumPos = r => v3([PODIUM[r].x, FLOOR + 0.12 + PODIUM[r].h + CARD.h / 2 + 0.01, PODIUM_Z]);
       cand.forEach((cid, i) => {
-        const skipped = d.skipped.includes(cid), r = rankIdx(cid);
+        const skipped = d.skipped.includes(cid), r = d.ranked.indexOf(cid);
         let pos = slot(cid), vis = true, scale = 1, red = 0, lock = false;
         if (id === "search") { const u = ease(phase(t, 0.55 + i * 0.07, 0.75 + i * 0.07)); pos = slot(cid).lerp(stage(i, sheetX), u); }
         else if (id === "access") {
@@ -252,8 +250,7 @@ window.ZaglobaStations = {
       // keywords highlighted on the question while searching (keyword half of the hybrid search)
       const kw = (id === "search" && t > 0.45) || (o > order("search") && o <= order("model"));
       refs.msgMarks.forEach(mk => paintMark(mk, kw ? "keyword" : "none"));
-      refs.pdfs.forEach(pdf => { pdf.g.visible = false; });
-      info.keywords = kw ? refs.msgMarks.length : 0; info.attachments = 0;
+      info.keywords = kw ? refs.msgMarks.length : 0;
       // search hub: ring pulses, beams to candidate slots
       const searching = id === "search" && t > 0.4 && t < 0.8;
       refs.ringMat.emissiveIntensity = searching ? 1.4 : 0.1;
@@ -298,7 +295,7 @@ window.ZaglobaStations = {
         const accessKnown = o > order("access") || (id === "access" && t > 0.3), rankKnown = o > order("rank") || (id === "rank" && t > 0.4);
         const rows = d.candidates.map(cid => {
           const sk = d.skipped.includes(cid), r = d.ranked.indexOf(cid);
-          return { title: Z.DOCS[cid].title, source: Z.DOCS[cid].source, semantic: d.scores[cid].semantic, keyword: d.scores[cid].keyword, scored: true,
+          return { title: Z.DOCS[cid].title, source: Z.DOCS[cid].source, semantic: d.scores[cid].semantic, keyword: d.scores[cid].keyword,
             access: accessKnown ? (sk ? "no" : "ok") : "", rank: rankKnown && r >= 0 ? r + 1 : 0, state: accessKnown && sk ? "skipped" : rankKnown && r < 0 ? "dropped" : "" };
         });
         const status = !accessKnown ? ["znaleziono " + d.candidates.length + " dokumenty kandydujące · wyszukiwanie hybrydowe", "line"]
@@ -317,7 +314,7 @@ window.ZaglobaStations = {
       });
       for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = id === "admin" || (sid === freshSrc && syncing) ? 1.2 : 0;
       // local model at work: takes question + sources in, its LED works (amber when abstaining)
-      k.poseCabinet(refs.blades, id, t, { ledTone: d && d.outcome === "nodata" ? "srcC" : "gpuLed" });
+      k.poseCabinet(id, t, { ledTone: d && d.outcome === "nodata" ? "srcC" : "gpuLed" });
       refs.gateMat.emissiveIntensity = id === "admin" ? 0.8 : 0;
       return ride ? { ...ride, scale } : { node: "none" };
     }

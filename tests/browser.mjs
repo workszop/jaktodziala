@@ -26,7 +26,7 @@ const watch = p => { p.on("console", m => { if (m.type() === "error") errors.pus
 const data = p => p.evaluate(() => ({ ...document.getElementById("app").dataset }));
 const ready = (p, r = "webgl") => p.waitForFunction(want => document.getElementById("app").dataset.renderer === want, r, { timeout: 25000 });
 // a condition that never comes true is a named failure (false), not a timeout exception that aborts the run
-const until = (p, fn, ms = 10000, arg) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true, () => false);
+const until = (p, fn, ms = 10000) => p.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
 const done = p => until(p, () => document.getElementById("app").dataset.phase === "done", 45000);
 const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 // Keyboard playthrough to the summary: `key` picks the prompt in the chat; after every scene the world's packet must match
@@ -51,7 +51,7 @@ try {
   // 0) home page: lists both journeys, keys 1/2 open them, old deep links still reach Klara
   const h = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
   await h.goto(ROOT_URL + "index.html");
-  const hd = await h.evaluate(() => ({ ...document.getElementById("home").dataset, apps: [...document.querySelectorAll(".choice")].map(a => a.dataset.app + ">" + a.getAttribute("href")) }));
+  const hd = await h.evaluate(() => ({ ready: document.getElementById("home").dataset.ready, apps: [...document.querySelectorAll(".choice")].map(a => a.dataset.app + ">" + a.getAttribute("href")) }));
   check("home lists Klara and Zagłoba", hd.ready === "true" && hd.apps.join() === "klara>klara.html,zagloba>zagloba.html", hd.apps.join());
   check("home: one top-level heading", await h.locator("h1").count() === 1);
   check("home: both scene visuals load", await h.evaluate(() => [...document.querySelectorAll(".choice img")].every(i => i.complete && i.naturalWidth > 0)));
@@ -97,6 +97,9 @@ try {
   // 2) real-time keyboard playthrough of a protected-data run
   await page.keyboard.press("r");
   check("restart returns to the idle start", await idleRobot(page));
+  // the self-test restored Auto and the restart keeps it: the playthrough runs step by step, driven only by its keys
+  await page.click("#btnStep");
+  check("playthrough starts step by step", (await data(page)).auto === "false");
   const seen = await playthrough(page, "1");
   check("playthrough reaches the summary", seen.at(-1) === "final", seen.join(">"));
   check("one run recorded, routed locally", (await data(page)).runs === "1" && (await page.evaluate(() => App.state.runs[0].target)) === "local");
@@ -125,7 +128,11 @@ try {
     await g.goto(BASE + "?auto=0"); await ready(g); await g.focus("#btnStart"); await g.keyboard.press(key);
     check(`keyboard Start (${key === " " ? "Space" : key}) leaves focus on Dalej`, await g.evaluate(() => document.activeElement.id) === "btnNext");
   }
-  await g.evaluate(() => App.goTo("final")); await g.focus("#final .final-actions button:nth-child(3)"); await g.keyboard.press("Enter");
+  // Dalej by keyboard into the chat: without a prompt Dalej is disabled, so focus moves on to a prompt chip, not to the page
+  await done(g); await g.focus("#btnNext"); await g.keyboard.press("Enter");
+  const fc = await g.evaluate(() => { const a = document.activeElement; return { scene: document.getElementById("app").dataset.scene, on: a.getAttribute("role") === "radio" ? "chip" : a.id === "btnNext" && !a.disabled ? "btnNext" : a.tagName }; });
+  check("Dalej into the chat keeps keyboard focus (a prompt chip)", fc.scene === "chat" && (fc.on === "chip" || fc.on === "btnNext"), fc.scene + " / " + fc.on);
+  await g.evaluate(() => App.goTo("final")); await g.locator("#final .final-actions button", { hasText: "Zacznij od nowa" }).focus(); await g.keyboard.press("Enter");
   check("Zacznij od nowa by keyboard puts focus on Start", await g.evaluate(() => document.activeElement.id) === "btnStart" && (await data(g)).phase === "idle");
   for (const q of ["prompt=complex&scene=chat", "prompt=complex"]) {
     await g.goto(BASE + "?auto=0&" + q); await ready(g);
@@ -135,10 +142,35 @@ try {
   await g.goto(BASE + "?auto=0&scene=admin&prompt=complex"); await ready(g);
   const pol0 = (await data(g)).policy; await g.evaluate(() => App.setPolicy("bogus"));
   check("App.setPolicy ignores an unknown policy", (await data(g)).policy === pol0, (await data(g)).policy);
+  await g.focus("#btnBack"); await g.evaluate(() => App.setPolicy("off"));
+  check("App.setPolicy leaves keyboard focus where it was", (await data(g)).policy === "off" && await g.evaluate(() => document.activeElement.id) === "btnBack", await g.evaluate(() => document.activeElement.id || document.activeElement.tagName));
   await g.click('.opts [role="radio"]:nth-child(2)');
   check("clicking a policy option selects it and keeps focus on it", (await data(g)).policy === "frontier" && await g.evaluate(() => document.activeElement.dataset.value) === "frontier");
   await g.keyboard.press("ArrowDown");
   check("arrow keys move the policy radio and its focus", (await data(g)).policy === "off" && await g.evaluate(() => document.activeElement.dataset.value) === "off");
+  // unknown scene and prompt ids are ignored: the scene stays and the render loop keeps running
+  await g.goto(BASE + "?auto=0&scene=admin&prompt=complex"); await ready(g);
+  const s0 = await data(g), f0 = await g.evaluate(() => App.world().frames);
+  const thrown = await g.evaluate(() => [() => App.goTo("nope"), () => App.startRun("nope")].map(f => { try { f(); return ""; } catch (e) { return e.message; } }).filter(Boolean));
+  const f1 = await g.evaluate(n => new Promise(res => { const t0 = performance.now(); (function poll() { const f = App.world().frames; if (f > n + 5 || performance.now() - t0 > 4000) res(f); else setTimeout(poll, 50); })(); }), f0);
+  const s1 = await data(g);
+  check("App.goTo / App.startRun ignore unknown ids, frames keep coming", !thrown.length && s1.scene === s0.scene && s1.phase === s0.phase && s1.prompt === s0.prompt && f1 > f0 + 5, thrown.join(" | ") + ` ${s1.scene}/${s1.phase} frames ${f0}→${f1}`);
+  // a deep-linked run keeps the setting it was made with: a later policy change applies to the next run only
+  await g.goto(BASE + "?auto=0&scene=admin&prompt=complex"); await ready(g);
+  const r0 = (await data(g)).route; await g.evaluate(() => { App.setPolicy("off"); App.goTo("return"); });
+  const r1 = (await data(g)).route;
+  check("deep-linked run keeps its route after a policy change (complex → apiq)", r0 === "apiq" && r1 === "apiq", r0 + " → " + r1);
+  // the same prompt run again announces its answer again (aria-live)
+  await g.goto(BASE + "?auto=0&prompt=routine&scene=chat"); await ready(g);
+  const said = await g.evaluate(() => {
+    const out = [], ann = document.getElementById("announce"), run = () => { for (const s of ["send", "scan", "gauge", "route", "model", "return"]) App.goTo(s); out.push(ann.textContent); ann.textContent = ""; };
+    run(); App.startRun("routine"); run(); return out;
+  });
+  check("a repeated run announces its answer again", said.length === 2 && said.every(Boolean), said.map(s => s.slice(0, 24) || "(empty)").join(" | "));
+  // the link's setting is where a restart (R) starts again
+  await g.goto(BASE + "?policy=off&auto=0"); await ready(g);
+  await g.evaluate(() => App.setPolicy("frontier")); await g.keyboard.press("r");
+  check("restart keeps the policy from the link (?policy=off)", (await data(g)).policy === "off" && (await data(g)).phase === "idle", (await data(g)).policy);
   await g.close();
   const rm = watch(await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" }));
   await rm.goto(BASE + "?auto=0");
@@ -171,6 +203,12 @@ try {
   check("App.setAccess(true) grants access", (await data(z)).boardAccess === "true" && await z.evaluate(() => App.state.settings.boardAccess) === true);
   await z.evaluate(() => App.setAccess(false)); await z.focus('.opts [role="radio"]'); await z.keyboard.press("ArrowDown");
   check("Zagłoba: arrow keys move the access radio and its focus", (await data(z)).boardAccess === "true" && await z.evaluate(() => document.activeElement.dataset.value) === "true");
+  // the link's setting is where a restart (R) and the self-test start again; the self-test still runs every access value
+  await z.goto(ROOT_URL + "zagloba.html?access=board&auto=0"); await ready(z);
+  await z.evaluate(() => App.setAccess(false)); await z.keyboard.press("r");
+  check("Zagłoba: restart keeps the access from the link (?access=board)", (await data(z)).boardAccess === "true", (await data(z)).boardAccess);
+  const zt2 = await z.evaluate(() => App.selfTest());
+  check("Zagłoba self-test from an ?access=board link passes and ends on it", zt2.ok && (await data(z)).boardAccess === "true" && (await data(z)).test === "pass", zt2.failures.slice(0, 3).join(" | "));
   const zm = watch(await browser.newPage({ viewport: { width: 390, height: 844 } }));
   await zm.goto(ROOT_URL + "zagloba.html" + "?scene=admin&prompt=restricted"); await ready(zm);
   check("Zagłoba: no horizontal overflow at 390px", await noOverflow(zm));

@@ -44,13 +44,17 @@ window.KlaraStations = {
     const { box, cylinder, sphere, group, strip, own, makePath, fakeText, seeded, paintMark } = k;
     const { clamp, phase, ease, easeOutBack, lerp, order } = k;
     const { FLOOR, RIDE, PORT_Z, GATE, LOCAL_TURN } = G;
-    const K = window.KlaraData, CFG = window.KlaraStations.config;
-    const SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], INLET = G.INLET;
+    const K = window.KlaraData, CFG = window.KlaraStations.config, SCAN_T = K.SCAN_T;
+    const SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], INLET = G.INLET, [SX, , SZ] = SWITCH;
     const PORT_X = { apiq: CFG.ports[0], frontier: CFG.ports[1] };
+    const KNEE = [PORT_X.frontier, 2.2]; // the frontier route turns here from its diagonal towards its port
     const CLOUD = Object.fromEntries(CFG.clouds.map(c => [c.key, c.pos]));
-    // Rails out of the switch, per route (the local ones belong to the engine's GPU bay); lit tracks run along them.
-    const RAILS = { local: G.LOCAL_RAILS, apiq: [[[10.9, 2.58], [10.9, 1.82]]], frontier: [[[11.05, 2.65], [11.5, 2.2]], [[11.5, 2.2], [11.5, 1.82]]] };
-    const ARROW_ANGLE = { local: Math.atan2(-(LOCAL_TURN[1] - 2.8), LOCAL_TURN[0] - 10.9), apiq: Math.PI / 2, frontier: Math.PI / 4, neutral: -Math.PI / 2 };
+    // Rails out of the switch, per route (the local ones belong to the engine's GPU bay); lit tracks run along them up to the ports.
+    const RAIL_END = PORT_Z + 0.08;
+    const RAILS = { local: G.LOCAL_RAILS, apiq: [[[PORT_X.apiq, SZ - 0.22], [PORT_X.apiq, RAIL_END]]], frontier: [[[SX + 0.15, SZ - 0.15], KNEE], [KNEE, [PORT_X.frontier, RAIL_END]]] };
+    // the switch arrow points from the switch towards a floor point [x, z]
+    const aim = ([x, z]) => Math.atan2(SZ - z, x - SX);
+    const ARROW_ANGLE = { local: aim(LOCAL_TURN), apiq: aim([PORT_X.apiq, PORT_Z]), frontier: aim(KNEE), neutral: -Math.PI / 2 };
     const NEEDLE_REST = 1.15;
     const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
     const RULE_HIT = ["danger", "ok", "accent"];
@@ -159,7 +163,7 @@ window.KlaraStations = {
     }
     // ─── Office: open space – a desk pod, a coffee point, a whiteboard and a lounge corner ───
     function buildOffice() {
-      for (const x of [4.4, 5.7]) { k.deskAt(x, 1.55, undefined, Math.PI); k.deskAt(x, 2.21); k.chair(x, 0.92, 0); k.chair(x, 2.86, Math.PI); }
+      for (const x of [4.4, 5.7]) { k.deskAt(x, 1.55, Math.PI); k.deskAt(x, 2.21); k.chair(x, 0.92, 0); k.chair(x, 2.86, Math.PI); }
       // coffee point along the back wall
       box(1.1, 0.38, 1.5, 0.45, 0.7, "counter", 0, undefined, 0.02); box(1.1, 0.38, 1.56, 0.48, 0.04, "wood", 0.7, undefined, 0.02);
       for (let i = 0; i < 3; i++) box(0.6 + i * 0.5, 0.605, 0.44, 0.01, 0.6, "edge", 0.05);
@@ -180,9 +184,7 @@ window.KlaraStations = {
       k.plant(0.42, 2.6, 1.1); k.plant(7.1, 1.2, 0.8);
     }
     function build() {
-      buildXrayTunnel(); buildGaugeAndSwitch();
-      refs.blades = k.localBay();
-      buildRulesBoard();
+      buildXrayTunnel(); buildGaugeAndSwitch(); buildRulesBoard();
       refs.drawXray = k.rackScreen(SCAN[0] - 0.02, "PODGLĄD SKANU · RENTGEN TREŚCI", drawXray);
       k.plates([[9.2, "1", "SKANER", "scan"], [10.0, "2", "ZŁOŻONOŚĆ", "accent"], [10.9, "3", "ZWROTNICA", "admin"], [12.25, "4", "MODELE LOKALNE", "ok"]]);
       buildTracks();
@@ -197,7 +199,7 @@ window.KlaraStations = {
       const out = {
         local: k.localRoute(SWITCH),
         apiq: exit([[PORT_X.apiq, RIDE, PORT_Z], [PORT_X.apiq, RIDE, 1.3]], CLOUD.apiq),
-        frontier: exit([[PORT_X.frontier, RIDE, 2.2], [PORT_X.frontier, RIDE, PORT_Z], [PORT_X.frontier, RIDE, 1.3]], CLOUD.frontier)
+        frontier: exit([[KNEE[0], RIDE, KNEE[1]], [PORT_X.frontier, RIDE, PORT_Z], [PORT_X.frontier, RIDE, 1.3]], CLOUD.frontier)
       };
       [paths.inlet2scan, paths.scan2gauge, paths.gauge2switch] = k.legs(inside);
       for (const key of Object.keys(out)) {
@@ -216,24 +218,23 @@ window.KlaraStations = {
     // ─── Pose ───
     function pose(s, dt, { o }) {
       const id = s.sceneId, t = s.t, d = s.decision;
-      const promptCount = s.prompt ? s.prompt.sensitive.length : 0, total = d ? d.protectedCount : 0;
+      const att = s.prompt && s.prompt.attachment, promptItems = s.prompt ? s.prompt.sensitive : [], attItems = att ? att.sensitive : [];
       const target = d ? d.target : "local", external = target !== "local";
       // X-ray tunnel glows while the sheet is inside; the monitor shows message + attachment findings
       const scanning = id === "scan" && t > 0.4 && t < 0.88;
       refs.tunnelMat.emissiveIntensity = scanning ? 1.3 + 0.4 * Math.sin(t * 80) : 0.1; refs.beaconMat.emissiveIntensity = scanning ? 1.6 : 0;
-      const promptItems = s.prompt ? s.prompt.sensitive : [], attItems = s.prompt && s.prompt.attachment ? s.prompt.attachment.sensitive : [];
       // protected data: found by the scanner (message words, then the attachment's pages once read), then masked
       const past = o > order("scan"), inScan = id === "scan";
-      const found = past || (inScan && t > 0.5), docRead = past || (inScan && t > 0.62), masked = past || (inScan && t > 0.72);
+      const found = past || (inScan && t > SCAN_T.found), docRead = past || (inScan && t > SCAN_T.read), masked = past || (inScan && t > SCAN_T.masked);
       let xv = "idle", msgState = "none", attState = "none";
       if ((inScan && t >= 0.4) || (past && o <= order("return"))) {
         msgState = masked ? "masked" : found ? "found" : "none";
         attState = masked ? "masked" : docRead ? "found" : found ? "reading" : "none";
         const any = promptItems.length + attItems.length > 0;
-        xv = !past && t < 0.5 ? "scanning" : !any ? (masked ? "clear" : "scanning") : masked ? "masked" : "found";
+        xv = !past && t < SCAN_T.found ? "scanning" : !any ? (masked ? "clear" : "scanning") : masked ? "masked" : "found";
       }
       refs.drawXray({ view: xv, msg: xv === "idle" ? [] : promptItems.map(i => ({ token: i.token })), msgState,
-        att: s.prompt && s.prompt.attachment && xv !== "idle" ? { name: s.prompt.attachment.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
+        att: att && xv !== "idle" ? { name: att.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
       info.scanView = xv;
       // gauge needle
       const level = d ? K.COMPLEXITY[d.level].needle : 0;
@@ -264,13 +265,12 @@ window.KlaraStations = {
       // the chosen GPU server swallows the sheet (model) and hands back the answer (return)
       const scale = external ? 1 : k.swallowScale(id, t);
       // on the sheet: words light up red when the scanner finds them, then turn into black redaction bars
-      const pulse = id === "scan" && t > 0.5 && t < 0.72 ? 0.5 * Math.abs(Math.sin(t * 60)) : 0;
+      const pulse = inScan && t > SCAN_T.found && t < SCAN_T.masked ? 0.5 * Math.abs(Math.sin(t * 60)) : 0;
       const state = show => (show ? (masked ? "masked" : "found") : "none");
-      refs.msgMarks.forEach((mk, i) => paintMark(mk, state(found && i < promptCount), pulse));
-      const attachments = s.prompt && s.prompt.attachment ? [s.prompt.attachment] : [];
-      const attCount = Math.max(0, total - promptCount);
-      refs.pdfs.forEach((pdf, i) => { pdf.g.visible = i < attachments.length; pdf.marks.forEach((mk, n) => paintMark(mk, state(docRead && n < attCount), pulse)); });
-      info.attachments = Math.min(attachments.length, refs.pdfs.length);
+      refs.msgMarks.forEach((mk, i) => paintMark(mk, state(found && i < promptItems.length), pulse));
+      // one attachment at most: the first PDF on the sheet, its marks for the attachment's protected fragments
+      refs.pdfs.forEach((pdf, i) => { pdf.g.visible = !!att && i === 0; pdf.marks.forEach((mk, n) => paintMark(mk, state(docRead && n < attItems.length), pulse)); });
+      info.attachments = att ? 1 : 0;
       // rules board: lamps light one after another in the route scene
       const rules = Array.isArray(s.rules) ? s.rules : [];
       refs.ruleLamps.forEach((m, i) => {
@@ -287,7 +287,7 @@ window.KlaraStations = {
         tr.meshes.forEach(m => { m.visible = lit; }); if (lit) { const c = colors[st === "on" ? "ok" : "danger"]; tr.m.color.set(c); tr.m.emissive.set(c); }
       }
       // local model at work (only when the route stays local)
-      k.poseCabinet(refs.blades, id, t, { active: !external });
+      k.poseCabinet(id, t, { active: !external });
       const gateU = id === "model" && external ? 1 - clamp(Math.abs(phase(t, 0, 0.72) - paths[target].gateU) * 9) : 0;
       refs.gateMat.emissiveIntensity = gateU * 1.4;
       for (const key of ["apiq", "frontier"]) refs.cloudMats[key].emissiveIntensity = (id === "model" && target === key ? phase(t, 0.72, 0.85) : id === "return" && target === key ? 1 - phase(t, 0, 0.3) : 0) * 1.5;

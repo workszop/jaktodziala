@@ -199,7 +199,7 @@ window.WorldCore = (() => {
 
     // ─── Build: office ───
     // A desk with a monitor; the user sits on the +z side (rot turns it around its centre).
-    function deskAt(x, z, screenMat, rot = 0) {
+    function deskAt(x, z, rot = 0, screenMat) {
       screenMat = screenMat || (refs.deskScreenMat ??= own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }));
       const g = group(x, 0, z); g.rotation.y = rot;
       box(0, 0, 1.3, 0.66, 0.05, "wood", 0.7, g, 0.03);
@@ -209,7 +209,6 @@ window.WorldCore = (() => {
       const screen = new THREE.Mesh(geo("plane", [0.58, 0.34], () => new THREE.PlaneGeometry(0.58, 0.34)), screenMat);
       screen.position.set(0, 1.04, -0.177); g.add(screen);
       box(0, 0.06, 0.42, 0.14, 0.015, "keyboard", 0.75, g);
-      return screen;
     }
     function plant(x, z, s = 1) {
       cylinder(x, z, 0.13 * s, 0.24 * s, "pot", 0, world, 0.16 * s);
@@ -225,7 +224,7 @@ window.WorldCore = (() => {
     function buildOffice() {
       const { DESK, ADMIN } = G;
       refs.screenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.25, roughness: 0.3 });
-      refs.mainScreen = deskAt(DESK.x, DESK.z, refs.screenMat);
+      deskAt(DESK.x, DESK.z, 0, refs.screenMat);
       plant(7.1, 5.6, 1.15); plant(7.15, 3.4, 0.9); // by the glass partition
       if (S.buildOffice) S.buildOffice();
       box(ADMIN.x, ADMIN.z, 0.5, 0.36, 0.78, "rack", 0, world, 0.04);
@@ -287,8 +286,9 @@ window.WorldCore = (() => {
       refs.frontMats = [side, side, side, side, front, side];
       refs.front = mesh(geo("box", [w + 0.02, h, 0.06], () => new THREE.BoxGeometry(w + 0.02, h, 0.06)), refs.frontMats);
       refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01); refs.frontZ = refs.front.position.z; // closed places: pose() opens from them
-      // the belt from the inlet, and two spare racks behind the GPU bay
+      // the belt from the inlet, the GPU bay (local models) and two spare racks behind it
       belt(8.475, 10.925);
+      refs.blades = localBay();
       for (const x of [13.55, 13.9]) box(x, 0.6, 0.32, 0.7, 1.0, "rack", FLOOR, world, 0.02);
     }
     // A monitor or board perched on the rack's back panel: a clamp over the panel's top edge and a neck under the screen's centre,
@@ -390,10 +390,10 @@ window.WorldCore = (() => {
     // The chosen GPU server swallows the sheet (model) and hands back the answer (return).
     const swallowScale = (id, t) => (id === "model" ? 1 - 0.97 * ease(phase(t, 0.28, 0.4)) : id === "return" ? 0.03 + 0.97 * ease(phase(t, 0.02, 0.14)) : 1);
     // Local model at work: the chosen server slides out, takes the sheet in, its LED works (in ledTone). Inactive = the route went elsewhere.
-    function poseCabinet(blades, id, t, { active = true, ledTone = "gpuLed" } = {}) {
+    function poseCabinet(id, t, { active = true, ledTone = "gpuLed" } = {}) {
       const work = !active ? 0 : id === "model" ? phase(t, 0.4, 0.55) : id === "return" ? 1 - phase(t, 0, 0.3) : 0;
       const slide = !active ? 0 : id === "model" ? ease(phase(t, 0.05, 0.25)) * (1 - ease(phase(t, 0.5, 0.65))) : id === "return" ? 1 - ease(phase(t, 0.3, 0.42)) : 0;
-      blades.forEach((b, i) => {
+      refs.blades.forEach((b, i) => {
         const chosen = i === CAB.chosen, c = colors[chosen && work > 0 ? ledTone : "gpuLed"];
         b.g.position.z = b.z + (chosen ? slide * 0.3 : 0); b.led.color.set(c); b.led.emissive.set(c);
         b.led.emissiveIntensity = chosen ? 0.15 + Math.max(work, active && id === "model" && t > 0.4 ? 1 : 0) * 1.6 : 0.15 + 0.1 * (i % 2);
@@ -492,7 +492,8 @@ window.WorldCore = (() => {
       refs.msgMarks = markBars(msg.tilt, msg.layout, MSG_MARK_ROWS, SHEET.tex, SHEET.w, SHEET.h, 0.026);
       refs.pdfs = [];
       for (let i = 0; i < PDF.max; i++) {
-        const pg = group(0.075 + i * 0.03, -0.07 - i * 0.025, 0.008 - i * 0.004, msg.tilt); pg.rotation.z = -0.12 + i * 0.1;
+        // hidden until a product shows an attachment
+        const pg = group(0.075 + i * 0.03, -0.07 - i * 0.025, 0.008 - i * 0.004, msg.tilt); pg.rotation.z = -0.12 + i * 0.1; pg.visible = false;
         const shadow = new THREE.Mesh(geo("plane", [PDF.w + 0.01, PDF.h + 0.01], () => new THREE.PlaneGeometry(PDF.w + 0.01, PDF.h + 0.01)), material("chipMasked"));
         shadow.position.set(0.004, -0.004, -0.001); pg.add(shadow);
         const { tex, layout } = pdfTexture(31 + i * 17);
@@ -761,7 +762,7 @@ window.WorldCore = (() => {
         S = product.create({
           THREE, G, colors, refs, paths, info, world,
           clamp, phase, ease, easeOutBack, lerp, v3, order, font, own, box, cylinder, sphere, group, strip, canvasTexture,
-          makePath, seeded, fakeText, paintMark, plates, rackScreen, rackBoard, padlock, localBay, localRoute, legs, returnPath,
+          makePath, seeded, fakeText, paintMark, plates, rackScreen, rackBoard, padlock, localRoute, legs, returnPath,
           ride, swallowScale, poseCabinet, deskAt, chair, plant
         });
         buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();

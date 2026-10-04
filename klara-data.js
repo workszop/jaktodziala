@@ -104,6 +104,9 @@
 
   const SOURCE_URL = "https://quanticalab.ai/klara_website.html";
 
+  // Scanner timeline (t within the scan scene): protected fragments found, the attachment's pages read, everything masked.
+  const SCAN_T = Object.freeze({ found: 0.5, read: 0.62, masked: 0.72 });
+
   // ─── Helpers ───
   const promptById = id => PROMPTS.find(p => p.id === id) || null;
   const sceneIndex = id => SCENES.findIndex(s => s.id === id);
@@ -163,5 +166,5 @@
     return s.packet;
   }
 
-  root.KlaraData = Object.freeze({ ORG, USER, ROUTES, ROUTE_IDS, POLICY_OPTIONS, DEFAULT_SETTINGS, COMPLEXITY, PROMPTS, SCENES, BENEFITS, SOURCE_URL, promptById, protectedItems, decide, packetAt });
+  root.KlaraData = Object.freeze({ ORG, USER, ROUTES, ROUTE_IDS, POLICY_OPTIONS, DEFAULT_SETTINGS, COMPLEXITY, PROMPTS, SCENES, BENEFITS, SOURCE_URL, SCAN_T, promptById, protectedItems, decide, packetAt });
 })(typeof window !== "undefined" ? window : globalThis);
