@@ -18,6 +18,8 @@
   // ─── Helpers ───
   const docTitle = id => Z.DOCS[id].title;
   const srcTitle = id => Z.SOURCES[Z.DOCS[id].source].title;
+  // Polish plural: 1 dokument, 2–4 dokumenty (but 12–14 dokumentów), otherwise dokumentów
+  const docCount = n => n + " " + (n === 1 ? "dokument" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "dokumenty" : "dokumentów");
 
   // ─── Hooks ───
   const hooks = {
@@ -54,7 +56,7 @@
         case "login": return { lead: "Robot siada przy komputerze. Na pulpicie czeka Zagłoba – asystent wiedzy organizacji. Logowanie kontem organizacji przenosi role i uprawnienia użytkownika.",
           bullets: ["Wiedza jest rozproszona między dokumentami, repozytoriami i systemami – Zagłoba daje do niej jeden, bezpieczny dostęp.", "Odpowiedzi są generowane wyłącznie na podstawie informacji, do których użytkownik ma uprawnienia.", "Organizacja: " + Z.ORG.name + " (" + Z.ORG.note + ") · użytkownik: " + Z.USER.name + ", " + Z.USER.dept] };
         case "chat": return { lead: "Użytkownik zadaje pytanie tak, jak koledze z działu. Zagłoba przeszuka dostępne źródła, wybierze najtrafniejsze informacje i odpowie ze wskazaniem dokumentów.",
-          bullets: ["Pytanie 2 dotyczy dokumentów, do których użytkownik nie ma pełnego dostępu.", "Pytanie 3 nie ma pokrycia w bazie, pytanie 4 dotyczy dokumentu zmienionego wczoraj.", "Klawisze 1–4 wybierają pytanie, Enter wysyła."] };
+          bullets: ["Pytanie 1 dotyczy procedury – jeden z pasujących dokumentów leży w folderze Zarządu, do którego użytkownik nie ma dostępu.", "Pytanie 2 nie ma pokrycia w bazie wiedzy.", "Klawisze 1–2 wybierają pytanie, Enter wysyła."] };
         case "send": return { lead: "Pytanie jedzie do Quantica AI Server w serwerowni organizacji. Zagłoba może działać w pełni lokalnie – bez przekazywania dokumentów zewnętrznym dostawcom AI.",
           bullets: ["Organizacja zachowuje kontrolę nad miejscem przechowywania i przetwarzania danych.", "Koszty nie zależą od liczby zapytań do komercyjnych modeli językowych."] };
         case "search": return { lead: "Zagłoba przeszukuje bazę wiedzy połączoną z SharePoint, OneDrive i Amazon S3. Wyszukiwanie jest hybrydowe: semantyczne (znaczenie) i po słowach kluczowych.",
@@ -119,7 +121,7 @@
         tiles: [["Pytania", runs.length, ""], ["Odpowiedzi ze źródłami", runs.filter(r => r.outcome === "answer").length, "ok"], ["Brak pokrycia", runs.filter(r => r.outcome === "nodata").length, "admin"],
           ["Dokumenty pominięte (uprawnienia)", runs.reduce((a, r) => a + r.skipped.length, 0), "danger"], ["Źródła danych", Z.SOURCE_IDS.length, ""], ["Przypisy w odpowiedziach", runs.reduce((a, r) => a + r.citations.length, 0), ""]],
         logTitle: "Źródła danych · synchronizacja w tle",
-        log: Z.SOURCE_IDS.map(sid => [Z.SOURCES[sid].title + " · " + Object.values(Z.DOCS).filter(doc => doc.source === sid).length + " dokumenty (demo)", sid === "sharepoint" ? "zmiana wykryta wczoraj" : "aktualne"]),
+        log: Z.SOURCE_IDS.map(sid => [Z.SOURCES[sid].title + " · " + docCount(Object.values(Z.DOCS).filter(doc => doc.source === sid).length) + " (demo)", "aktualne"]),
         settingsTitle: "Uprawnienia: " + Z.USER.name + " · folder Zarządu",
         rule: ["Role i poziomy dostępu są zachowane", "Odpowiedzi powstają wyłącznie z dokumentów, do których użytkownik ma uprawnienia."],
         rerun: ["Zadaj ponownie pytanie o procedurę", "procedure"]
