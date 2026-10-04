@@ -41,13 +41,13 @@ window.KlaraStations = {
     "use strict";
     // ─── Constants ───
     const { THREE, G, colors, refs, paths, info, font } = k;
-    const { box, cylinder, sphere, group, strip, own, mesh, geo, makePath, fakeText, seeded, paintMark } = k;
+    const { box, cylinder, sphere, group, strip, own, makePath, fakeText, seeded, paintMark } = k;
     const { clamp, phase, ease, easeOutBack, lerp, order } = k;
     const { FLOOR, RIDE, PORT_Z, GATE, LOCAL_TURN } = G;
-    const K = window.KlaraData;
+    const K = window.KlaraData, CFG = window.KlaraStations.config;
     const SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], INLET = G.INLET;
-    const PORT_X = { apiq: 10.9, frontier: 11.5 };
-    const CLOUD = { apiq: [9.3, 3.1, -2.7], frontier: [13.2, 3.1, -2.7] };
+    const PORT_X = { apiq: CFG.ports[0], frontier: CFG.ports[1] };
+    const CLOUD = Object.fromEntries(CFG.clouds.map(c => [c.key, c.pos]));
     // Rails out of the switch, per route (the local ones belong to the engine's GPU bay); lit tracks run along them.
     const RAILS = { local: G.LOCAL_RAILS, apiq: [[[10.9, 2.58], [10.9, 1.82]]], frontier: [[[11.05, 2.65], [11.5, 2.2]], [[11.5, 2.2], [11.5, 1.82]]] };
     const ARROW_ANGLE = { local: Math.atan2(-(LOCAL_TURN[1] - 2.8), LOCAL_TURN[0] - 10.9), apiq: Math.PI / 2, frontier: Math.PI / 4, neutral: -Math.PI / 2 };
@@ -55,7 +55,7 @@ window.KlaraStations = {
     const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
     const RULE_HIT = ["danger", "ok", "accent"];
     const PAGE_FLAGS = [[0, 2], [1], [3]];
-    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle", blade: 0 });
+    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle" });
 
     // ─── Build: stations ───
     function buildXrayTunnel() {
@@ -72,13 +72,9 @@ window.KlaraStations = {
       refs.beaconMat = own("scan", { emissive: colors.scan, emissiveIntensity: 0 });
       cylinder(x + 0.3, 3.1, 0.04, 0.06, refs.beaconMat, top + 0.1);
     }
-    // Preview monitor above the back panel: the message on the left, attachments on the right.
-    function buildXrayMonitor() {
-      refs.drawXray = k.rackScreen(SCAN[0] - 0.02, "PODGLĄD SKANU · RENTGEN TREŚCI", drawXray);
-      refs.drawXray({ view: "idle" });
-    }
-    // What the X-ray screen shows: view = idle | scanning | found | masked | clear.
-    function drawXray(c, st, W) {
+    // What the X-ray preview monitor (above the back panel) shows: the message on the left, attachments on the right;
+    // view = idle | scanning | found | masked | clear.
+    function drawXray(c, st) {
       const line = colors.xrayLine, red = colors.danger, ink = colors.ink, paper = colors.paper, ok = colors.ok;
       const pane = (x, title) => { c.strokeStyle = line; c.globalAlpha = 0.35; c.lineWidth = 2; c.strokeRect(x, 84, 466, 420); c.globalAlpha = 1; c.fillStyle = line; c.font = font(700, 22, true); c.fillText(title, x + 16, 116); };
       pane(30, "WIADOMOŚĆ"); pane(528, "ZAŁĄCZNIK");
@@ -116,7 +112,7 @@ window.KlaraStations = {
     function buildGaugeAndSwitch() {
       box(GAUGE[0], 2.3, 0.08, 0.08, 0.36, "metal", FLOOR + 0.12);
       const dial = group(GAUGE[0], 0.74, 2.32);
-      const disc = mesh(geo("cyl", [0.27, 0.27, 0.04, 32], () => new THREE.CylinderGeometry(0.27, 0.27, 0.04, 32)), "paper", dial); disc.rotation.x = Math.PI / 2;
+      const disc = cylinder(0, 0, 0.27, 0.04, "paper", -0.02, dial, 0.27, 32); disc.rotation.x = Math.PI / 2;
       const zones = [["gaugeLow", Math.PI / 2 + 0.33, 0.8], ["gaugeMid", Math.PI / 2 - 0.33, 0.66], ["gaugeHigh", Math.PI / 2 - 1.13, 0.8]];
       for (const [c, start, len] of zones) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.235, 24, 1, start, len), own(c, { side: THREE.DoubleSide })); ring.position.z = 0.022; dial.add(ring);
@@ -186,7 +182,8 @@ window.KlaraStations = {
     function build() {
       buildXrayTunnel(); buildGaugeAndSwitch();
       refs.blades = k.localBay();
-      buildRulesBoard(); buildXrayMonitor();
+      buildRulesBoard();
+      refs.drawXray = k.rackScreen(SCAN[0] - 0.02, "PODGLĄD SKANU · RENTGEN TREŚCI", drawXray);
       k.plates([[9.2, "1", "SKANER", "scan"], [10.0, "2", "ZŁOŻONOŚĆ", "accent"], [10.9, "3", "ZWROTNICA", "admin"], [12.25, "4", "MODELE LOKALNE", "ok"]]);
       buildTracks();
     }
@@ -194,12 +191,13 @@ window.KlaraStations = {
     // ─── Build: inner paths ───
     function buildPaths() {
       const inside = [INLET, SCAN, GAUGE, SWITCH];
+      // an external route: from the switch `via` its port, through the exit gate, then up to the cloud `c`
+      const exit = (via, c) => [{ line: [SWITCH, ...via, [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
+        { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [c[0], c[1] + 1.35, c[2] + 0.75], [c[0], c[1] + 0.82, c[2]]] }];
       const out = {
         local: k.localRoute(SWITCH),
-        apiq: [{ line: [SWITCH, [10.9, RIDE, PORT_Z], [10.9, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
-          { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [CLOUD.apiq[0], CLOUD.apiq[1] + 1.35, CLOUD.apiq[2] + 0.75], [CLOUD.apiq[0], CLOUD.apiq[1] + 0.82, CLOUD.apiq[2]]] }],
-        frontier: [{ line: [SWITCH, [11.5, RIDE, 2.2], [11.5, RIDE, PORT_Z], [11.5, RIDE, 1.3], [11.25, RIDE, 0.9], GATE, [11.25, RIDE, -0.5]] },
-          { curve: [[11.25, RIDE, -0.5], [11.25, 1.6, -0.9], [CLOUD.frontier[0], CLOUD.frontier[1] + 1.35, CLOUD.frontier[2] + 0.75], [CLOUD.frontier[0], CLOUD.frontier[1] + 0.82, CLOUD.frontier[2]]] }]
+        apiq: exit([[PORT_X.apiq, RIDE, PORT_Z], [PORT_X.apiq, RIDE, 1.3]], CLOUD.apiq),
+        frontier: exit([[PORT_X.frontier, RIDE, 2.2], [PORT_X.frontier, RIDE, PORT_Z], [PORT_X.frontier, RIDE, 1.3]], CLOUD.frontier)
       };
       [paths.inlet2scan, paths.scan2gauge, paths.gauge2switch] = k.legs(inside);
       for (const key of Object.keys(out)) {
@@ -224,13 +222,15 @@ window.KlaraStations = {
       const scanning = id === "scan" && t > 0.4 && t < 0.88;
       refs.tunnelMat.emissiveIntensity = scanning ? 1.3 + 0.4 * Math.sin(t * 80) : 0.1; refs.beaconMat.emissiveIntensity = scanning ? 1.6 : 0;
       const promptItems = s.prompt ? s.prompt.sensitive : [], attItems = s.prompt && s.prompt.attachment ? s.prompt.attachment.sensitive : [];
+      // protected data: found by the scanner (message words, then the attachment's pages once read), then masked
+      const past = o > order("scan"), inScan = id === "scan";
+      const found = past || (inScan && t > 0.5), docRead = past || (inScan && t > 0.62), masked = past || (inScan && t > 0.72);
       let xv = "idle", msgState = "none", attState = "none";
-      if ((id === "scan" && t >= 0.4) || (o > order("scan") && o <= order("return"))) {
-        const after = o > order("scan");
-        msgState = after || t > 0.72 ? "masked" : t > 0.5 ? "found" : "none";
-        attState = after || t > 0.72 ? "masked" : t > 0.62 ? "found" : t > 0.5 ? "reading" : "none";
+      if ((inScan && t >= 0.4) || (past && o <= order("return"))) {
+        msgState = masked ? "masked" : found ? "found" : "none";
+        attState = masked ? "masked" : docRead ? "found" : found ? "reading" : "none";
         const any = promptItems.length + attItems.length > 0;
-        xv = !after && t < 0.5 ? "scanning" : !any ? (after || t > 0.72 ? "clear" : "scanning") : msgState === "masked" ? "masked" : "found";
+        xv = !past && t < 0.5 ? "scanning" : !any ? (masked ? "clear" : "scanning") : masked ? "masked" : "found";
       }
       refs.drawXray({ view: xv, msg: xv === "idle" ? [] : promptItems.map(i => ({ token: i.token })), msgState,
         att: s.prompt && s.prompt.attachment && xv !== "idle" ? { name: s.prompt.attachment.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
@@ -263,8 +263,7 @@ window.KlaraStations = {
       }
       // the chosen GPU server swallows the sheet (model) and hands back the answer (return)
       const scale = external ? 1 : k.swallowScale(id, t);
-      // protected data: words light up red when the scanner finds them, then turn into black redaction bars
-      const masked = o > order("scan") || (id === "scan" && t > 0.72), found = o > order("scan") || (id === "scan" && t > 0.5), docRead = o > order("scan") || (id === "scan" && t > 0.62);
+      // on the sheet: words light up red when the scanner finds them, then turn into black redaction bars
       const pulse = id === "scan" && t > 0.5 && t < 0.72 ? 0.5 * Math.abs(Math.sin(t * 60)) : 0;
       const state = show => (show ? (masked ? "masked" : "found") : "none");
       refs.msgMarks.forEach((mk, i) => paintMark(mk, state(found && i < promptCount), pulse));
@@ -275,7 +274,7 @@ window.KlaraStations = {
       // rules board: lamps light one after another in the route scene
       const rules = Array.isArray(s.rules) ? s.rules : [];
       refs.ruleLamps.forEach((m, i) => {
-        const shown = rules[i] && (o > order("route") && o <= order("final") || (id === "route" && t > 0.15 + i * 0.15));
+        const shown = rules[i] && (o > order("route") || (id === "route" && t > 0.15 + i * 0.15));
         const st = shown ? rules[i] : "idle", c = colors[st === "hit" ? RULE_HIT[i] : st === "pass" ? "paper" : "chipMasked"];
         m.color.set(c); m.emissive.set(c); m.emissiveIntensity = st === "hit" ? 1.6 : st === "pass" ? 0.25 : 0;
         refs.ruleRows[i].opacity = st === "hit" ? 0.28 : 0; refs.ruleRows[i].color.set(colors[RULE_HIT[i]]); refs.ruleRows[i].emissive.set(colors[RULE_HIT[i]]);
@@ -318,7 +317,7 @@ window.KlaraStations = {
       const d = s.decision, routeScenes = order(s.sceneId) >= order("route");
       if (!d || !routeScenes) return "";
       if (l.route) return d.states[l.route];
-      if (l.id === "gate") return d.target === "local" ? (d.states.apiq === "faded" ? "faded" : d.states.apiq) : "on";
+      if (l.id === "gate") return d.target === "local" ? d.states.apiq : "on";
       return "";
     }
     function collisionRuns() {

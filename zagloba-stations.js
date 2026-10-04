@@ -46,15 +46,15 @@ window.ZaglobaStations = {
     const { box, cylinder, sphere, group, own, canvasTexture, makePath, fakeText, seeded, paintMark } = k;
     const { clamp, phase, ease, lerp, v3, order } = k;
     const { FLOOR, RIDE, GPU_IN } = G;
-    const Z = window.ZaglobaData;
+    const Z = window.ZaglobaData, CFG = window.ZaglobaStations.config;
     const SEARCH = [9.2, RIDE, 2.8], ACCESS = [10.05, RIDE, 2.8], RANK = [10.9, RIDE, 2.8], INLET = G.INLET;
     const STAGE_Z = 2.42, CARD = { w: 0.15, h: 0.2 };
     const TRAY = [9.95, 0.32, 3.45];
     const PODIUM = [{ x: 10.9, h: 0.3 }, { x: 10.6, h: 0.22 }, { x: 11.2, h: 0.15 }], PODIUM_Z = 2.3;
     const SRC_TONE = Object.fromEntries(Z.SOURCE_IDS.map(sid => [sid, Z.SOURCES[sid].tone]));
-    const CLOUD = { sharepoint: [9.0, 3.1, -2.7], onedrive: [11.25, 3.45, -3.1], s3: [13.5, 3.1, -2.7] };
+    const CLOUD = Object.fromEntries(CFG.clouds.map(c => [c.key, c.pos]));
     const DOC_IDS = Object.keys(Z.DOCS);
-    Object.assign(info, { candidates: 0, skippedShown: 0, podium: 0, keywords: 0, monitorView: "idle", blade: 0 });
+    Object.assign(info, { candidates: 0, skippedShown: 0, podium: 0, keywords: 0, monitorView: "idle" });
 
     // ─── Build: knowledge index (two shelf units with binders and document cards) ───
     function buildIndex() {
@@ -130,13 +130,10 @@ window.ZaglobaStations = {
       });
       refs.srcLamps = Z.SOURCE_IDS.map((_, i) => { const m = own("ok", { emissive: colors.ok, emissiveIntensity: 0.3 }); sphere(W / 2 - 0.07, rowY(i), 0.06, 0.035, m, g); return m; });
     }
-    // Results monitor above the back panel: candidates, scores, access, rank.
-    function buildMonitor() {
-      refs.drawMonitor = k.rackScreen(SEARCH[0] - 0.02, "PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", drawMonitor);
-      refs.drawMonitor({ view: "idle" });
-    }
+    // What the results monitor (above the back panel) shows: candidates, scores, access, rank.
     function drawMonitor(c, st, W) {
       const line = colors.xrayLine;
+      c.fillStyle = line;
       if (st.view === "idle") {
         c.globalAlpha = 0.7; c.font = font(500, 24, true); c.fillText("indeks gotowy · " + Z.SOURCE_IDS.length + " źródła · synchronizacja w tle", 46, 130);
         c.fillText("oczekiwanie na pytanie…", 46, 560); c.globalAlpha = 1; return;
@@ -159,7 +156,7 @@ window.ZaglobaStations = {
     }
     // Sync pipes from the source clouds through the wall opening into the index.
     function buildPipes() {
-      refs.pipes = {}; refs.pipePulses = [];
+      refs.pipes = {};
       const glass = own("tube", { transparent: true, opacity: 0.35, depthWrite: false });
       refs.pipeGlow = own("accent", { emissive: colors.accent, emissiveIntensity: 0, transparent: true, opacity: 0 });
       const common = [[11.25, 1.2, -0.6], [11.25, 0.45, 0.06], [11.25, 0.45, 0.9], [9.2, 0.45, 1.2], [9.2, 0.45, 1.95]];
@@ -170,7 +167,7 @@ window.ZaglobaStations = {
         const core = new THREE.Mesh(new THREE.TubeGeometry(curve, 160, 0.016, 6, false), refs.pipeGlow); core.userData.noCollide = true; core.castShadow = false; k.world.add(core);
         refs.pipes[sid] = curve;
       }
-      for (let i = 0; i < 3; i++) { const m = own(Object.values(SRC_TONE)[i], { emissive: colors[Object.values(SRC_TONE)[i]], emissiveIntensity: 1.4 }); const p = sphere(0, 0, 0, 0.035, m); p.visible = false; p.userData.noCollide = true; refs.pipePulses.push(p); }
+      refs.pipePulses = Z.SOURCE_IDS.map(sid => { const tone = SRC_TONE[sid], p = sphere(0, 0, 0, 0.035, own(tone, { emissive: colors[tone], emissiveIntensity: 1.4 })); p.visible = false; p.userData.noCollide = true; return p; });
     }
     // ─── Office: a knowledge office – bookcases, a low file cabinet, a reading table and a floor lamp ───
     function buildOffice() {
@@ -200,7 +197,9 @@ window.ZaglobaStations = {
       k.plant(0.45, 3.1, 1.2);
     }
     function build() {
-      buildIndex(); buildCards(); buildSearch(); buildGate(); buildPodium(); buildConnectors(); buildMonitor(); buildPipes();
+      buildIndex(); buildCards(); buildSearch(); buildGate(); buildPodium(); buildConnectors();
+      refs.drawMonitor = k.rackScreen(SEARCH[0] - 0.02, "PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", drawMonitor);
+      buildPipes();
       refs.blades = k.localBay();
       k.plates([[9.2, "1", "WYSZUKIWANIE", "accent"], [10.05, "2", "UPRAWNIENIA", "admin"], [10.9, "3", "TRAFNOŚĆ", "accent"], [12.25, "4", "MODEL LOKALNY", "ok"]]);
     }
@@ -244,7 +243,7 @@ window.ZaglobaStations = {
       return plan;
     }
     function pose(s, dt, { o }) {
-      const id = s.sceneId, t = s.t, d = s.decision, p = s.prompt;
+      const id = s.sceneId, t = s.t, d = s.decision;
       // sheet position inside the server and back
       const ride = id === "search" ? k.ride(paths.inlet2search, t, 0.2, 0.4, "search") : id === "access" ? k.ride(paths.search2access, t, 0, 0.25, "access")
         : id === "rank" ? k.ride(paths.access2rank, t, 0, 0.2, "rank") : id === "model" ? k.ride(paths.local, t, 0, 0.4, "local")
@@ -266,8 +265,8 @@ window.ZaglobaStations = {
         const a = v3([SEARCH[0], RIDE + 0.1, SEARCH[2]]), z = v3(refs.slots[cid]), mid = a.clone().add(z).multiplyScalar(0.5), len = a.distanceTo(z);
         b.position.copy(mid); b.scale.set(1, len, 1); b.quaternion.setFromUnitVectors(v3([0, 1, 0]), z.clone().sub(a).normalize());
       });
-      // fresh document arrives through the SharePoint pipe at the start of the search
-      const freshId = d && d.fresh.length ? d.fresh[0] : null;
+      // a fresh document arrives through its source's pipe at the start of the search
+      const freshId = d && d.fresh.length ? d.fresh[0] : null, freshSrc = freshId ? Z.DOCS[freshId].source : null;
       // cards
       const sheetX = pos ? pos.x : SEARCH[0], plan = d ? cardPlan(s, d, sheetX) : {};
       let shownCandidates = 0, inTray = 0, onPodium = 0;
@@ -278,7 +277,7 @@ window.ZaglobaStations = {
         // the changed document only reaches the index through the sync pipe during this search
         if (cid === freshId && o < order("search")) vis = false;
         else if (cid === freshId && id === "search" && t < 0.3) {
-          const pipe = refs.pipes.sharepoint;
+          const pipe = refs.pipes[freshSrc];
           cpos = t < 0.22 ? pipe.getPointAt(clamp(ease(phase(t, 0, 0.22)))) : pipe.getPointAt(1).lerp(v3(refs.slots[cid]), ease(phase(t, 0.22, 0.3)));
           sc = t < 0.22 ? 2.2 : lerp(2.2, 1, ease(phase(t, 0.22, 0.3)));
         }
@@ -314,9 +313,9 @@ window.ZaglobaStations = {
       refs.srcLamps.forEach((m, i) => { m.emissiveIntensity = syncing ? 0.8 + 0.6 * Math.abs(Math.sin(t * 20 + i)) : 0.3; });
       refs.pipePulses.forEach((pulse, i) => {
         const sid = Z.SOURCE_IDS[i], on = id === "admin";
-        pulse.visible = on; if (on) pulse.position.copy(refs.pipes[sid].getPointAt(((t * 1.6) + i / 3) % 1));
+        pulse.visible = on; if (on) pulse.position.copy(refs.pipes[sid].getPointAt(((t * 1.6) + i / Z.SOURCE_IDS.length) % 1));
       });
-      for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = id === "admin" || (sid === "sharepoint" && syncing) ? 1.2 : 0;
+      for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = id === "admin" || (sid === freshSrc && syncing) ? 1.2 : 0;
       // local model at work: takes question + sources in, its LED works (amber when abstaining)
       k.poseCabinet(refs.blades, id, t, { ledTone: d && d.outcome === "nodata" ? "srcC" : "gpuLed" });
       refs.gateMat.emissiveIntensity = id === "admin" ? 0.8 : 0;

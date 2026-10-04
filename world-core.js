@@ -10,7 +10,7 @@ window.WorldCore = (() => {
 
   // ─── Constants ───
   const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
-  const CORE_COLORS = ["paper", "cream", "ink", "wood", "metal", "upholstery", "pot", "soil", "leaf", "leafLight", "screen", "wall", "wallServer",
+  const CORE_COLORS = ["paper", "cream", "ink", "wood", "metal", "upholstery", "pot", "leaf", "leafLight", "screen", "wall", "wallServer",
     "glass", "foundation", "edge", "officeFloor", "serverFloor", "tileLine", "background", "light", "sky", "bounce", "brand", "admin", "accent",
     "accentTint", "rack", "rackDark", "rackFace", "rackLine", "belt", "scan", "gpu", "gpuLed", "cloud", "hazard", "ok", "danger", "chipMasked",
     "cable", "keyboard", "lockMetal", "rug", "xrayBg", "xrayLine"];
@@ -18,7 +18,7 @@ window.WorldCore = (() => {
   const LOCAL_TURN = [11.45, 3.45], CAB = { x: 12.25, z: 2.75, chosen: 1 };
   // Shared geometry. The sheet's centre rides RIDE high inside the rack and FLOOR_RIDE above the floor cable (half-height ~0.16).
   const G = {
-    FLOOR: 0.02, BELT_Y: 0.33, RIDE: 0.48, FLOOR_RIDE: 0.23, LANE_Z: 0.55, HOLE_TOP: 0.74, PORT_W: 0.44, PORT_Z: 1.74,
+    FLOOR: 0.02, RIDE: 0.48, FLOOR_RIDE: 0.23, LANE_Z: 0.55, HOLE_TOP: 0.74, PORT_W: 0.44, PORT_Z: 1.74,
     DESK: { x: 2.6, z: 2.25 }, STAND: [2.6, 3.0], DOOR: [0.8, 5.6], MON: [2.6, 0.99, 2.24], ADMIN: { x: 5.9, z: 4.15 },
     INLET: [8.58, 0.48, 2.8], RACK: { cx: 10.6, cz: 2.8, w: 4.6, d: 2.2, h: 1.1 }, GATE: [11.25, 0.48, 0.06], GATE_X: [10.92, 11.58],
     LOCAL_TURN, CAB, GPU_IN: [12.25, 0.49, 2.95], LOCAL_RAILS: [[[11.08, 2.98], LOCAL_TURN], [LOCAL_TURN, [CAB.x - 0.3, LOCAL_TURN[1]]]]
@@ -57,7 +57,7 @@ window.WorldCore = (() => {
     const user = { yaw: 0, zoom: 1, drag: null };
     let labelItems = [], lastSig = "", settled = false, coSvg = null, scratch = null;
     const callouts = new Map();
-    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0 };
+    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0, blade: 0 };
 
     // ─── Helpers ───
     const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -315,7 +315,7 @@ window.WorldCore = (() => {
         c.fillStyle = colors.xrayBg; c.fillRect(0, 0, W, H);
         c.fillStyle = colors.xrayLine; c.font = font(700, 30, true); c.fillText(title, 30, 48);
         c.globalAlpha = 0.25; c.fillRect(30, 64, W - 60, 2); c.globalAlpha = 1;
-        drawBody(c, st, W, H); tex.needsUpdate = true;
+        drawBody(c, st, W); tex.needsUpdate = true;
       };
     }
     // Static board on the rack: an admin header bar, then one framed row per item (drawRow(c, row, y, w, i) fills it in).
@@ -357,9 +357,11 @@ window.WorldCore = (() => {
         plate.rotation.x = -Math.PI / 2; plate.position.set(x, G.FLOOR + 0.125, 3.52); plate.receiveShadow = true; world.add(plate);
       }
     }
-    // Cabinet of GPU servers (one local model each), fronts facing the viewer; the chosen server slides out.
-    function serverCabinet({ x, z, chosen = 1, label = "MODEL LOKALNY" }) {
-      const base = G.FLOOR + 0.12;
+    // The local GPU bay: rails from the last station to the cabinet of GPU servers (one local model each, fronts facing
+    // the viewer; the chosen server slides out), and the cabinet itself. Returns its blades.
+    function localBay() {
+      for (const [a, b] of G.LOCAL_RAILS) strip(a, b, 0.2, 0.04, "belt", G.FLOOR + 0.12);
+      const { x, z } = CAB, base = G.FLOOR + 0.12;
       for (const [dx, dz] of [[-0.39, -0.32], [0.39, -0.32], [-0.39, 0.32], [0.39, 0.32]]) box(x + dx, z + dz, 0.05, 0.05, 0.95, "metal", base);
       box(x, z, 0.84, 0.7, 0.04, "rackDark", base + 0.91); box(x, z, 0.84, 0.7, 0.04, "rackDark", base);
       box(x, z - 0.33, 0.84, 0.03, 0.91, "rackDark", base);
@@ -368,17 +370,12 @@ window.WorldCore = (() => {
         box(0, 0, 0.7, 0.6, 0.16, "gpu", 0, g, 0.02);
         const led = own("gpuLed", { emissive: colors.gpuLed, emissiveIntensity: 0.15 });
         box(0, 0.302, 0.62, 0.01, 0.025, led, 0.02, g);
-        const tex = canvasTexture(512, 64, (c, w) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, 64); c.fillStyle = colors.rackLine; c.font = font(700, 34); c.textAlign = "center"; c.fillText(label + " " + (i + 1), w / 2, 44); });
+        const tex = canvasTexture(512, 64, (c, w) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, 64); c.fillStyle = colors.rackLine; c.font = font(700, 34); c.textAlign = "center"; c.fillText("MODEL LOKALNY " + (i + 1), w / 2, 44); });
         const lab = new THREE.Mesh(geo("plane", [0.6, 0.075], () => new THREE.PlaneGeometry(0.6, 0.075)), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); lab.position.set(0, 0.11, 0.304); g.add(lab);
         // the chosen server swallows the sheet, so it is exempt from the collision check
-        if (i === chosen) g.traverse(o => { o.userData.noCollide = true; });
+        if (i === CAB.chosen) g.traverse(o => { o.userData.noCollide = true; });
         return { g, led, z };
       });
-    }
-    // The local GPU bay: rails from the last station to the cabinet, and the cabinet itself. Returns its blades.
-    function localBay() {
-      for (const [a, b] of G.LOCAL_RAILS) strip(a, b, 0.2, 0.04, "belt", G.FLOOR + 0.12);
-      return serverCabinet(G.CAB);
     }
     // Segments of the local route from the last station into the chosen server.
     const localRoute = from => [{ line: [from, [LOCAL_TURN[0], G.RIDE, LOCAL_TURN[1]], [CAB.x, G.RIDE, LOCAL_TURN[1]], G.GPU_IN] }];
@@ -557,7 +554,7 @@ window.WorldCore = (() => {
       refs.packet.visible = refs.answer.visible = false;
       let out = { pos: null, carrier: null, scale: 1, node: "none" };
       if (id === "send") out = { pos: paths.send.getPointAt(ease(phase(t, 0.05, 0.95))), carrier: t > 0.02 ? "packet" : null, scale: 1, node: t >= 0.95 ? "inlet" : "moving" };
-      const prod = S.pose(s, dt, { o, open }) || {};
+      const prod = S.pose(s, dt, { o }) || {};
       if (id !== "send") out = { ...out, ...prod };
       info.packetNode = out.node || "none";
       const carrier = out.carrier === "packet" ? refs.packet : out.carrier === "answer" ? refs.answer : null;
@@ -763,7 +760,7 @@ window.WorldCore = (() => {
         world = new THREE.Group(); scene.add(world); scratch = new THREE.Vector3();
         S = product.create({
           THREE, G, colors, refs, paths, info, world,
-          clamp, phase, ease, easeOutBack, lerp, v3, order, font, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture,
+          clamp, phase, ease, easeOutBack, lerp, v3, order, font, own, box, cylinder, sphere, group, strip, canvasTexture,
           makePath, seeded, fakeText, paintMark, plates, rackScreen, rackBoard, padlock, localBay, localRoute, legs, returnPath,
           ride, swallowScale, poseCabinet, deskAt, chair, plant
         });

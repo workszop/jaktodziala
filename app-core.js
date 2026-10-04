@@ -3,7 +3,7 @@
    an idle start (every simulation waits with the robot standing in the room until Start),
    App.probe() / App.selfTest(), the admin panel and the product's one admin setting (URL param, App.<api>, data-<attr>,
    self-test matrix). A product supplies its data, setting and content hooks:
-   AppCore.start({ data, world, brand, setting, autoOrder, dwell, icons, flowNodes, flowPath, adminFrom, nextLabels, hooks }). */
+   AppCore.start({ data, world, brand, setting, autoOrder, dwell, icons, flowNodes, flowPath, adminFrom, nextLabels, calloutScenes, hooks }). */
 window.AppCore = (() => {
   "use strict";
 
@@ -29,7 +29,7 @@ window.AppCore = (() => {
 
   function start(P) {
     const K = P.data, W = P.world, B = P.brand, H = P.hooks, SET = P.setting;
-    const decide = P.decide || K.decide, defaultSettings = P.defaultSettings || (() => ({ ...K.DEFAULT_SETTINGS }));
+    const defaultSettings = () => ({ ...K.DEFAULT_SETTINGS });
     const SCENES = K.SCENES, IDX = Object.fromEntries(SCENES.map((s, i) => [s.id, i]));
     const ICONS = { ...BASE_ICONS, ...(P.icons || {}) };
     const AUTO_ORDER = P.autoOrder, DWELL = { login: 2.4, admin: 6, final: 9, default: 3.4, ...(P.dwell || {}) }, NEXT = { ...NEXT_LABELS, ...(P.nextLabels || {}) };
@@ -38,9 +38,10 @@ window.AppCore = (() => {
     const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // ─── State ───
+    // phase: idle (waiting for Start at the scene's first frame) → playing (t runs to 1) → done (t = 1)
     const state = {
-      scene: 0, t: 0, playing: false, idle: false, promptId: null, settings: defaultSettings(), runSettings: null,
-      runId: 0, recorded: -1, runs: [], reached: 0, auto: false, dwell: 0, fresh: false, announced: "",
+      scene: 0, t: 0, phase: "idle", promptId: null, settings: defaultSettings(), runSettings: null,
+      runId: 0, runs: [], reached: 0, auto: false, dwell: 0, newRun: false, announced: "",
       renderer: "loading", monitorKey: "", progressKey: "", lastFrame: performance.now()
     };
 
@@ -58,7 +59,7 @@ window.AppCore = (() => {
     const sid = () => sceneDef().id;
     const prompt = () => K.promptById(state.promptId);
     const settings = () => state.runSettings || state.settings;
-    const decision = () => decide(prompt(), settings());
+    const decision = () => K.decide(prompt(), settings());
     const phase = (t, a, b) => Math.min(1, Math.max(0, (t - a) / (b - a)));
     const after = (id, t0 = 1) => state.scene > IDX[id] || (state.scene === IDX[id] && state.t >= t0);
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -104,7 +105,7 @@ window.AppCore = (() => {
     // ─── Render: steps, panel, flow ───
     function buildSteps() {
       SCENES.forEach((s, i) => {
-        const li = el("li"), b = button("step", null, () => { if (i > state.reached) return; if (state.idle && i === state.scene) begin(); else goTo(i, { play: i !== state.scene }); });
+        const li = el("li"), b = button("step", null, () => { if (i > state.reached) return; if (state.phase === "idle" && i === state.scene) begin(); else goTo(i, { play: i !== state.scene }); });
         b.dataset.scene = s.id; b.append(el("span", "n", s.n), el("span", "t", s.short)); b.title = s.n + " · " + s.title;
         li.appendChild(b); stepsEl.appendChild(li);
       });
@@ -118,7 +119,7 @@ window.AppCore = (() => {
       if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2 });
     }
     function buildFlow(container) {
-      for (const n of P.flowNodes) { const d = el("div", "node"); d.dataset.node = n.id; d.dataset.state = "idle"; d.append(icon(n.icon || n.id), el("span", null, n.label)); container.appendChild(d); }
+      for (const n of P.flowNodes) { const d = el("div", "node"); d.dataset.node = n.id; d.dataset.state = "idle"; d.append(icon(n.id), el("span", null, n.label)); container.appendChild(d); }
     }
     // The packet walks P.flowPath one node per scene from chat on (login shares the first node); later scenes find it all done.
     function renderFlow() {
@@ -135,8 +136,8 @@ window.AppCore = (() => {
       pActions.replaceChildren(...(s.id === "return" ? [button("btn btn-ghost", B.otherPrompt, () => startRun(nextUntried()))]
         : P.adminFrom.includes(s.id) ? [button("btn btn-ghost", B.adminJump, () => goTo(IDX.admin))] : []));
       btnBack.disabled = state.scene === 0;
-      nextLabel.textContent = state.idle ? "Start" : NEXT[s.id] || "Dalej";
-      btnStart.hidden = !state.idle;
+      nextLabel.textContent = state.phase === "idle" ? "Start" : NEXT[s.id] || "Dalej";
+      btnStart.hidden = state.phase !== "idle";
       btnNext.disabled = s.id === "chat" && !state.promptId;
       inspector.hidden = !(state.scene >= IDX.send && state.scene <= IDX.return && prompt());
     }
@@ -279,9 +280,9 @@ window.AppCore = (() => {
 
     // ─── Render: contract + orchestration ───
     function renderContract() {
-      const p = prompt(), d = p ? decision() : null, done = !state.playing && state.t >= 1, ds = app.dataset;
-      ds.scene = sid(); ds.phase = state.idle ? "idle" : done ? "done" : "playing"; ds.prompt = p ? p.id : "";
-      ds.packet = done ? K.packetAt(sid(), d) : "moving"; ds.runs = String(state.runs.length);
+      const p = prompt(), d = p ? decision() : null, ds = app.dataset;
+      ds.scene = sid(); ds.phase = state.phase; ds.prompt = p ? p.id : "";
+      ds.packet = state.phase === "done" ? K.packetAt(sid(), d) : "moving"; ds.runs = String(state.runs.length);
       ds.auto = String(state.auto); ds.renderer = state.renderer; ds.reached = String(state.reached);
       if (H.contract) H.contract(c, ds, p, d);
       ds[SET.attr] = String(state.settings[SET.key]);
@@ -291,11 +292,11 @@ window.AppCore = (() => {
       const had = document.activeElement, focused = had && had !== document.body;
       renderSteps(); renderPanel(); state.progressKey = ""; onProgress();
       // focus on a control that went away (detached, inert, disabled or hidden – Start once pressed) moves to the main one
-      if (focused && (!had.isConnected || had.closest("[inert]") || had.disabled || had.hidden || had.checkVisibility?.() === false)) (state.idle ? btnStart : btnNext).focus({ preventScroll: true });
+      if (focused && (!had.isConnected || had.closest("[inert]") || had.disabled || had.hidden || had.checkVisibility?.() === false)) (state.phase === "idle" ? btnStart : btnNext).focus({ preventScroll: true });
     }
     function onProgress() {
       pProg.firstChild.style.width = (state.t * 100).toFixed(1) + "%";
-      const key = sid() + "|" + Math.floor(state.t * 40) + "|" + state.promptId + "|" + JSON.stringify(state.settings) + "|" + state.playing;
+      const key = sid() + "|" + Math.floor(state.t * 40) + "|" + state.promptId + "|" + JSON.stringify(state.settings) + "|" + state.phase;
       if (key === state.progressKey) return; state.progressKey = key;
       if (!inspector.hidden) H.renderInspector(c);
       renderFlow(); renderMonitor(); renderFinal(); renderContract();
@@ -309,42 +310,40 @@ window.AppCore = (() => {
       if (sid() === "return" && i !== state.scene) recordRun();
       state.scene = Math.max(0, Math.min(SCENES.length - 1, i));
       state.reached = Math.max(state.reached, state.scene);
-      state.idle = idle; state.t = idle || (play && !REDUCED) ? 0 : 1; state.playing = !idle && state.t < 1; state.dwell = 0;
-      if (sid() === "send" && state.fresh) { state.runId++; state.fresh = false; state.reached = IDX.send; state.runSettings = { ...state.settings }; }
-      renderScene(); if (!state.playing && !idle) sceneDone();
+      state.t = idle || (play && !REDUCED) ? 0 : 1; state.phase = idle ? "idle" : state.t < 1 ? "playing" : "done"; state.dwell = 0;
+      if (sid() === "send" && state.newRun) { state.runId++; state.newRun = false; state.reached = IDX.send; state.runSettings = { ...state.settings }; }
+      renderScene(); if (state.phase === "done") sceneDone();
     }
     // Start: the robot walks to the computer and logs in (Auto, if on, carries on from there)
-    function begin() {
-      if (!state.idle) return;
-      state.idle = false; state.t = REDUCED ? 1 : 0; state.playing = state.t < 1; state.dwell = 0;
-      renderScene(); if (!state.playing) sceneDone();
-    }
+    function begin() { if (state.phase === "idle") goTo(state.scene); }
     function next() {
-      if (state.idle) { begin(); return; }
-      if (state.playing) { state.t = 1; state.playing = false; onProgress(); sceneDone(); return; }
+      if (state.phase === "idle") { begin(); return; }
+      if (state.phase === "playing") { state.t = 1; state.phase = "done"; onProgress(); sceneDone(); return; }
       if (sid() === "chat" && !state.promptId) return;
       if (sid() === "final") { restart(); return; }
       goTo(state.scene + 1);
     }
     function back() { if (state.scene > 0) goTo(state.scene - 1, { play: false }); }
     function recordRun() {
-      if (!prompt() || state.recorded === state.runId || state.runId === 0) return;
+      if (!prompt() || state.runId === 0 || state.runs.at(-1)?.runId === state.runId) return;
       state.runs.push({ runId: state.runId, promptId: state.promptId, settings: { ...settings() }, ...H.currentRun(c, decision()) });
-      state.recorded = state.runId; state.monitorKey = "";
+      state.monitorKey = "";
     }
     function sceneDone() { if (sid() === "return") recordRun(); state.progressKey = ""; onProgress(); }
+    // a chosen prompt opens a new run, logged once it has been sent; the stepper ends at the chat until then
+    function setPrompt(id) { state.promptId = id; state.newRun = true; state.reached = IDX.chat; }
     function choosePrompt(id) {
       if (sid() !== "chat" || !K.promptById(id)) return;
-      state.promptId = id; state.fresh = true; state.reached = IDX.chat; state.monitorKey = ""; renderScene();
+      setPrompt(id); state.monitorKey = ""; renderScene();
       const send = $("chatSend"); if (send && !state.auto) send.focus();
     }
-    function startRun(id) { if (sid() === "return") recordRun(); state.promptId = id; state.fresh = true; state.reached = IDX.chat; goTo(IDX.chat); }
+    function startRun(id) { if (sid() === "return") recordRun(); setPrompt(id); goTo(IDX.chat); }
     function setSettings(patch, focusSel) {
       state.settings = { ...state.settings, ...patch }; state.monitorKey = ""; renderScene();
       if (focusSel) { const f = display.querySelector(focusSel); if (f) f.focus(); }
     }
     function restart() {
-      Object.assign(state, { promptId: null, settings: defaultSettings(), runSettings: null, fresh: false, runs: [], recorded: -1, reached: 0, monitorKey: "", announced: "" });
+      Object.assign(state, { promptId: null, settings: defaultSettings(), runSettings: null, newRun: false, runs: [], reached: 0, monitorKey: "", announced: "" });
       if (W.resetView) W.resetView(); goTo(0, { idle: true });
     }
     function setAuto(on) {
@@ -353,7 +352,7 @@ window.AppCore = (() => {
       renderContract();
     }
     function autoTick(dt) {
-      if (!state.auto || state.playing || state.idle || help.open) return;
+      if (!state.auto || state.phase !== "done" || help.open) return;
       state.dwell += dt;
       const id = sid();
       if (id === "chat") { if (!state.promptId && state.dwell > 1.2) choosePrompt(nextUntried()); else if (state.promptId && state.dwell > 2.8) next(); return; }
@@ -408,14 +407,14 @@ window.AppCore = (() => {
       btnProbe.addEventListener("click", () => { const r = probe(); probeOut.textContent = (r.ok ? "OK – kontrakt DOM i inwarianty spełnione." : "BŁĘDY: " + r.failures.join(", ")) + "\n" + JSON.stringify({ scene: r.scene, prompt: r.prompt, packet: r.packet, renderer: r.world.renderer, worldPacket: r.world.packetNode }, null, 1); });
       // pressing a control takes over from autoplay (kiosk behaviour); rotating the 3D view does not
       document.addEventListener("pointerdown", e => {
-        if (!state.auto || state.idle || modeSwitch.contains(e.target) || !(e.target instanceof Element) || !e.target.closest("button, a, [role=radio]")) return;
+        if (!state.auto || state.phase === "idle" || modeSwitch.contains(e.target) || !(e.target instanceof Element) || !e.target.closest("button, a, [role=radio]")) return;
         setAuto(false);
       }, true);
       document.addEventListener("keydown", e => {
         if (help.open || e.ctrlKey || e.metaKey || e.altKey) return;
         const k = e.key, onButton = e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement;
         if ((k === " " || k === "Enter") && onButton) return;
-        if (state.auto && !state.idle && NAV_KEYS.includes(k.toLowerCase())) setAuto(false);
+        if (state.auto && state.phase !== "idle" && NAV_KEYS.includes(k.toLowerCase())) setAuto(false);
         const group = e.target.closest && e.target.closest('[role="radiogroup"]');
         if (group && ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(k)) {
           e.preventDefault();
@@ -428,8 +427,8 @@ window.AppCore = (() => {
         }
         if (k === "ArrowRight" || k === "PageDown" || k === " " || k.toLowerCase() === "n") { e.preventDefault(); next(); }
         else if (k === "ArrowLeft" || k === "PageUp") { e.preventDefault(); back(); }
-        else if (k === "Enter" && (state.idle || sid() === "chat")) { e.preventDefault(); next(); }
-        else if (["1", "2", "3", "4"].includes(k)) { const p = K.PROMPTS.find(x => x.key === k); if (!p) return; if (sid() === "chat") choosePrompt(p.id); else if (sid() === "return" && !state.playing) startRun(p.id); }
+        else if (k === "Enter" && (state.phase === "idle" || sid() === "chat")) { e.preventDefault(); next(); }
+        else if (["1", "2", "3", "4"].includes(k)) { const p = K.PROMPTS.find(x => x.key === k); if (!p) return; if (sid() === "chat") choosePrompt(p.id); else if (sid() === "return" && state.phase !== "playing") startRun(p.id); }
         else if (k.toLowerCase() === "a") setAuto(!state.auto);
         else if (k.toLowerCase() === "r") restart();
         else if (k.toLowerCase() === "h" || k === "?") help.showModal();
@@ -439,9 +438,9 @@ window.AppCore = (() => {
     }
     function loop(now) {
       const dt = Math.min(0.1, Math.max(0, (now - state.lastFrame) / 1000)); state.lastFrame = now;
-      if (state.playing) {
+      if (state.phase === "playing") {
         state.t = Math.min(1, state.t + dt * SPEED / sceneDef().dur);
-        if (state.t >= 1) { state.playing = false; sceneDone(); }
+        if (state.t >= 1) { state.phase = "done"; sceneDone(); }
         onProgress();
       }
       autoTick(dt);
@@ -461,9 +460,9 @@ window.AppCore = (() => {
     const so = SET.options.find(o => (o.param ?? o.value) === PARAMS.get(SET.param));
     if (so) { state.settings = { ...state.settings, [SET.key]: so.value }; state.runSettings = { ...state.settings }; }
     const pr = PARAMS.get("prompt"), sc = PARAMS.get("scene");
-    // a preset prompt that is still to be sent (no scene, or up to the chat) is a fresh run, logged like a chosen one
-    if (pr && K.promptById(pr)) { state.promptId = pr; state.fresh = !sc || IDX[sc] == null || IDX[sc] <= IDX.chat; }
-    if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) { state.reached = IDX[sc]; goTo(IDX[sc], { play: PARAMS.get("play") === "1" }); }
+    // a preset prompt that is still to be sent (no scene, or up to the chat) is a new run, logged like a chosen one
+    if (pr && K.promptById(pr)) { state.promptId = pr; state.newRun = !sc || IDX[sc] == null || IDX[sc] <= IDX.chat; }
+    if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) goTo(IDX[sc], { play: PARAMS.get("play") === "1" });
     else goTo(0, { idle: true });
     // Auto is the default; deep links to a scene (presenters, tests) and ?auto=0 start step by step.
     setAuto(PARAMS.get("auto") === "1" || (PARAMS.get("auto") !== "0" && !sc && PARAMS.get("selftest") !== "1"));
