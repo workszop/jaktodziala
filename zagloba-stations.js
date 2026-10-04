@@ -6,7 +6,7 @@ window.ZaglobaStations = {
     sceneOrder: ["login", "chat", "send", "search", "access", "rank", "model", "return", "admin", "final"],
     openScene: "search",
     travelScenes: ["search", "access", "rank", "model"],
-    colorKeys: ["srcA", "srcB", "srcC", "xrayBg", "xrayLine", "podium", "tube", "lockRed", "cabinet", "lampShade", "shelf"],
+    colorKeys: ["srcA", "srcB", "srcC", "podium", "tube", "lockRed", "cabinet", "lampShade", "shelf"],
     // library-like office: three tall windows, a rug under the reading table
     office: { windows: { count: 3, w: 1.55, h: 0.56, y: 0.4 }, rug: [5.0, 2.1, 2.5, 2.1] },
     ports: [9.2],
@@ -19,7 +19,6 @@ window.ZaglobaStations = {
       search: { target: [9.3, 0.95, 2.3], span: 2.9, angle: 0.4, elev: 0.46 },
       access: { target: [10.0, 0.6, 2.75], span: 2.5, angle: 0.45, elev: 0.55 },
       rank: { target: [10.85, 0.62, 2.6], span: 2.4, angle: 0.42, elev: 0.5 },
-      gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 },
       sources: { target: [10.9, 2.2, -1.5], span: 5.4, angle: 0.5, elev: 0.3 }
     },
     labels: [
@@ -35,7 +34,7 @@ window.ZaglobaStations = {
       { id: "s3", text: "Amazon S3", color: "srcC", pos: [13.5, 3.95, -2.7], scenes: ["send", "admin", "final"] }
     ],
     anchors: {
-      search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], sharepoint: [9.0, 3.5, -2.7]
+      search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], podium: [11.2, 0.75, 2.3], sharepoint: [9.0, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server z bazą wiedzy i źródła danych organizacji. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
   },
@@ -43,13 +42,12 @@ window.ZaglobaStations = {
   create(k) {
     "use strict";
     // ─── Constants ───
-    const { THREE, G, colors, refs, paths, info, options } = k;
-    const { box, cylinder, sphere, group, strip, own, canvasTexture, makePath, reverseSegments, fakeText, seeded, paintMark } = k;
+    const { THREE, G, colors, refs, paths, info, font } = k;
+    const { box, cylinder, sphere, group, own, canvasTexture, makePath, fakeText, seeded, paintMark } = k;
     const { clamp, phase, ease, lerp, v3, order } = k;
-    const { FLOOR, RIDE } = G;
+    const { FLOOR, RIDE, GPU_IN } = G;
     const Z = window.ZaglobaData;
     const SEARCH = [9.2, RIDE, 2.8], ACCESS = [10.05, RIDE, 2.8], RANK = [10.9, RIDE, 2.8], INLET = G.INLET;
-    const LOCAL_TURN = [11.45, 3.45], CAB = { x: 12.25, z: 2.75, chosen: 1 }, GPU_IN = [12.25, 0.49, 2.95];
     const STAGE_Z = 2.42, CARD = { w: 0.15, h: 0.2 };
     const TRAY = [9.95, 0.32, 3.45];
     const PODIUM = [{ x: 10.9, h: 0.3 }, { x: 10.6, h: 0.22 }, { x: 11.2, h: 0.15 }], PODIUM_Z = 2.3;
@@ -82,13 +80,12 @@ window.ZaglobaStations = {
           c.fillStyle = colors.paper; c.fillRect(0, 0, w, h);
           c.fillStyle = colors[tone]; c.fillRect(0, 0, w, 26);
           c.fillStyle = colors.rackLine; fakeText(c, 16, 60, w - 32, 6, 30, 8, seeded(id.length * 13));
-          if (doc.fresh) { c.fillStyle = colors.ok; c.fillRect(w - 70, 34, 60, 22); c.fillStyle = colors.paper; c.font = "800 15px " + (options.font || "sans-serif"); c.fillText("NOWY", w - 62, 50); }
+          if (doc.fresh) { c.fillStyle = colors.ok; c.fillRect(w - 70, 34, 60, 22); c.fillStyle = colors.paper; c.font = font(800, 15); c.fillText("NOWY", w - 62, 50); }
         });
         const g = group(...refs.slots[id]);
         const tint = own("paper", { map: tex, emissive: colors.paper, emissiveIntensity: 0, side: THREE.DoubleSide, transparent: true });
         const face = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w, CARD.h), tint); face.castShadow = true; g.add(face);
-        const lock = group(0, CARD.h / 2 + 0.06, 0.01, g); box(0, 0, 0.07, 0.03, 0.055, "lockRed", -0.027, lock, 0.01);
-        const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.007, 8, 16, Math.PI), k.material("lockRed")); shackle.position.y = 0.03; lock.add(shackle); lock.visible = false;
+        const lock = k.padlock(0, CARD.h / 2 + 0.06, 0.01, "lockRed", 0.63, g); lock.visible = false;
         g.traverse(o => { o.userData.noCollide = true; });
         refs.cards[id] = { g, tint, lock };
       }
@@ -99,7 +96,9 @@ window.ZaglobaStations = {
       refs.ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.018, 8, 48), refs.ringMat); refs.ring.rotation.x = Math.PI / 2; refs.ring.position.set(SEARCH[0], FLOOR + 0.24, SEARCH[2]); k.world.add(refs.ring);
       refs.pulseMat = own("accent", { emissive: colors.accent, emissiveIntensity: 1, transparent: true, opacity: 0 });
       refs.pulse = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.01, 6, 48), refs.pulseMat); refs.pulse.rotation.x = Math.PI / 2; refs.pulse.position.copy(refs.ring.position); k.world.add(refs.pulse);
-      refs.beams = [0, 1, 2, 3].map(i => {
+      // one beam per candidate, for the question with the most candidates
+      const beams = Math.max(...Z.PROMPTS.map(p => p.candidates.length));
+      refs.beams = Array.from({ length: beams }, (_, i) => {
         const m = own(i % 2 ? "admin" : "accent", { emissive: colors[i % 2 ? "admin" : "accent"], emissiveIntensity: 1.3, transparent: true, opacity: 0.75 });
         const b = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 6), m); b.visible = false; b.userData.noCollide = true; k.world.add(b); return b;
       });
@@ -116,7 +115,7 @@ window.ZaglobaStations = {
       box(TRAY[0], TRAY[2] + 0.12, 0.36, 0.02, 0.09, "lockRed", FLOOR + 0.12);
     }
     function buildPodium() {
-      const tex = n => canvasTexture(128, 96, (c, w, h) => { c.fillStyle = colors.accent; c.fillRect(0, 0, w, h); c.fillStyle = colors.paper; c.font = "800 64px " + (options.font || "sans-serif"); c.textAlign = "center"; c.fillText(String(n), w / 2, h / 2 + 22); });
+      const tex = n => canvasTexture(128, 96, (c, w, h) => { c.fillStyle = colors.accent; c.fillRect(0, 0, w, h); c.fillStyle = colors.paper; c.font = font(800, 64); c.textAlign = "center"; c.fillText(String(n), w / 2, h / 2 + 22); });
       PODIUM.forEach((p, i) => {
         box(p.x, PODIUM_Z, 0.28, 0.3, p.h, "podium", FLOOR + 0.12, undefined, 0.02);
         const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.1), new THREE.MeshStandardMaterial({ map: tex(i + 1) })); plate.position.set(p.x, FLOOR + 0.12 + p.h / 2, PODIUM_Z + 0.152); k.world.add(plate);
@@ -124,55 +123,39 @@ window.ZaglobaStations = {
     }
     // Connectors board above the back panel: one lamp per source system.
     function buildConnectors() {
-      const W = 1.56, H = 0.66, g = k.rackMonitor(10.75, W, H, 0);
-      const tex = canvasTexture(1024, 432, (c, w) => {
-        c.fillStyle = colors.rackFace; c.fillRect(0, 0, w, 432);
-        c.fillStyle = colors.admin; c.fillRect(0, 0, w, 74);
-        c.fillStyle = colors.paper; c.font = "700 34px " + (options.font || "sans-serif"); c.fillText("KONEKTORY ŹRÓDEŁ · SYNCHRONIZACJA W TLE", 32, 49);
-        Z.SOURCE_IDS.forEach((sid, i) => {
-          const y = 140 + i * 104; c.strokeStyle = colors.rackLine; c.lineWidth = 2; c.strokeRect(20, y - 44, w - 40, 88);
-          c.fillStyle = colors[SRC_TONE[sid]]; c.fillRect(40, y - 26, 52, 52);
-          c.fillStyle = colors.paper; c.font = "600 34px " + (options.font || "sans-serif"); c.fillText(Z.SOURCES[sid].title, 118, y + 4);
-          c.font = "400 24px " + (options.font || "sans-serif"); c.fillStyle = colors.rackLine; c.fillText("dokumenty pozostają w źródle · uprawnienia zachowane", 118, y + 34);
-        });
+      const { g, W, rowY } = k.rackBoard(10.75, "KONEKTORY ŹRÓDEŁ · SYNCHRONIZACJA W TLE", Z.SOURCE_IDS, (c, sid, y) => {
+        c.fillStyle = colors[SRC_TONE[sid]]; c.fillRect(40, y - 26, 52, 52);
+        c.fillStyle = colors.paper; c.font = font(600, 34); c.fillText(Z.SOURCES[sid].title, 118, y + 4);
+        c.font = font(400, 24); c.fillStyle = colors.rackLine; c.fillText("dokumenty pozostają w źródle · uprawnienia zachowane", 118, y + 34);
       });
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); face.position.set(0, H / 2, 0.03); g.add(face);
-      refs.srcLamps = Z.SOURCE_IDS.map((_, i) => { const y = H / 2 - (140 + i * 104 - 216) / 432 * H, m = own("ok", { emissive: colors.ok, emissiveIntensity: 0.3 }); sphere(W / 2 - 0.07, y, 0.06, 0.035, m, g); return m; });
+      refs.srcLamps = Z.SOURCE_IDS.map((_, i) => { const m = own("ok", { emissive: colors.ok, emissiveIntensity: 0.3 }); sphere(W / 2 - 0.07, rowY(i), 0.06, 0.035, m, g); return m; });
     }
     // Results monitor above the back panel: candidates, scores, access, rank.
     function buildMonitor() {
-      const W = 1.3, H = 0.775, g = k.rackMonitor(SEARCH[0] - 0.02, W, H);
-      refs.monCanvas = document.createElement("canvas"); refs.monCanvas.width = 1024; refs.monCanvas.height = 610;
-      refs.monTex = new THREE.CanvasTexture(refs.monCanvas); refs.monTex.colorSpace = THREE.SRGBColorSpace; refs.monTex.anisotropy = 4;
-      const screen = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: refs.monTex, toneMapped: false })); screen.position.set(0, H / 2, 0.03); g.add(screen);
-      refs.monKey = ""; drawMonitor({ view: "idle" });
+      refs.drawMonitor = k.rackScreen(SEARCH[0] - 0.02, "PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", drawMonitor);
+      refs.drawMonitor({ view: "idle" });
     }
-    function drawMonitor(st) {
-      const key = JSON.stringify(st); if (key === refs.monKey) return; refs.monKey = key;
-      const c = refs.monCanvas.getContext("2d"), W = 1024, mono = "Geist Mono, monospace", line = colors.xrayLine;
-      c.fillStyle = colors.xrayBg; c.fillRect(0, 0, W, 610);
-      c.fillStyle = line; c.font = "700 30px " + mono; c.fillText("PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", 30, 48);
-      c.globalAlpha = 0.25; c.fillRect(30, 64, W - 60, 2); c.globalAlpha = 1;
+    function drawMonitor(c, st, W) {
+      const line = colors.xrayLine;
       if (st.view === "idle") {
-        c.globalAlpha = 0.7; c.font = "500 24px " + mono; c.fillText("indeks gotowy · " + Z.SOURCE_IDS.length + " źródła · synchronizacja w tle", 46, 130);
-        c.fillText("oczekiwanie na pytanie…", 46, 560); c.globalAlpha = 1; refs.monTex.needsUpdate = true; return;
+        c.globalAlpha = 0.7; c.font = font(500, 24, true); c.fillText("indeks gotowy · " + Z.SOURCE_IDS.length + " źródła · synchronizacja w tle", 46, 130);
+        c.fillText("oczekiwanie na pytanie…", 46, 560); c.globalAlpha = 1; return;
       }
       const cols = [46, 96, 540, 690, 790, 890];
-      c.font = "700 20px " + mono; ["#", "DOKUMENT", "ŹRÓDŁO", "SEM.", "SŁOWA", "DOSTĘP"].forEach((h, i) => c.fillText(h, cols[i], 112));
+      c.font = font(700, 20, true); ["#", "DOKUMENT", "ŹRÓDŁO", "SEM.", "SŁOWA", "DOSTĘP"].forEach((h, i) => c.fillText(h, cols[i], 112));
       st.rows.forEach((r, i) => {
         const y = 160 + i * 66;
         const dim = r.state === "dropped" || r.state === "skipped";
         c.globalAlpha = dim ? 0.45 : 1;
         if (r.rank) { c.fillStyle = colors.accent; c.fillRect(30, y - 34, W - 60, 52); }
-        c.fillStyle = r.state === "skipped" ? colors.danger : colors.paper; c.font = "700 22px " + mono; c.fillText(r.rank ? String(r.rank) : "·", cols[0], y);
-        c.font = "500 21px " + mono; c.fillText(r.title.length > 32 ? r.title.slice(0, 31) + "…" : r.title, cols[1], y);
+        c.fillStyle = r.state === "skipped" ? colors.danger : colors.paper; c.font = font(700, 22, true); c.fillText(r.rank ? String(r.rank) : "·", cols[0], y);
+        c.font = font(500, 21, true); c.fillText(r.title.length > 32 ? r.title.slice(0, 31) + "…" : r.title, cols[1], y);
         c.fillStyle = colors[SRC_TONE[r.source]]; c.fillRect(cols[2], y - 18, 14, 22); c.fillStyle = colors.paper; c.fillText(Z.SOURCES[r.source].title, cols[2] + 22, y);
         if (r.scored) { c.fillText(String(Math.round(r.semantic * 100)), cols[3], y); c.fillText(String(Math.round(r.keyword * 100)), cols[4], y); }
-        if (r.access) { c.fillStyle = r.access === "ok" ? colors.ok : colors.danger; c.font = "700 21px " + mono; c.fillText(r.access === "ok" ? "tak" : "BRAK", cols[5], y); }
+        if (r.access) { c.fillStyle = r.access === "ok" ? colors.ok : colors.danger; c.font = font(700, 21, true); c.fillText(r.access === "ok" ? "tak" : "BRAK", cols[5], y); }
         c.globalAlpha = 1;
       });
-      c.fillStyle = st.tone === "danger" ? colors.danger : st.tone === "ok" ? colors.ok : line; c.font = "700 23px " + mono; c.fillText(st.status, 46, 565);
-      refs.monTex.needsUpdate = true;
+      c.fillStyle = st.tone === "danger" ? colors.danger : st.tone === "ok" ? colors.ok : line; c.font = font(700, 23, true); c.fillText(st.status, 46, 565);
     }
     // Sync pipes from the source clouds through the wall opening into the index.
     function buildPipes() {
@@ -217,21 +200,16 @@ window.ZaglobaStations = {
       k.plant(0.45, 3.1, 1.2);
     }
     function build() {
-      k.belt(8.475, 10.925);
       buildIndex(); buildCards(); buildSearch(); buildGate(); buildPodium(); buildConnectors(); buildMonitor(); buildPipes();
-      strip([11.08, 2.98], LOCAL_TURN, 0.2, 0.04, "belt", FLOOR + 0.12); strip(LOCAL_TURN, [CAB.x - 0.3, LOCAL_TURN[1]], 0.2, 0.04, "belt", FLOOR + 0.12);
-      refs.blades = k.serverCabinet({ x: CAB.x, z: CAB.z, chosen: CAB.chosen });
+      refs.blades = k.localBay();
       k.plates([[9.2, "1", "WYSZUKIWANIE", "accent"], [10.05, "2", "UPRAWNIENIA", "admin"], [10.9, "3", "TRAFNOŚĆ", "accent"], [12.25, "4", "MODEL LOKALNY", "ok"]]);
-      for (const x of [13.55, 13.9]) box(x, 0.6, 0.32, 0.7, 1.0, "rack", FLOOR, undefined, 0.02);
     }
 
     // ─── Build: inner paths ───
     function buildPaths() {
-      const inside = [{ line: [INLET, SEARCH, ACCESS, RANK] }];
-      const local = [{ line: [RANK, [LOCAL_TURN[0], RIDE, LOCAL_TURN[1]], [CAB.x, RIDE, LOCAL_TURN[1]], GPU_IN] }];
-      paths.inlet2search = makePath([{ line: [INLET, SEARCH] }]); paths.search2access = makePath([{ line: [SEARCH, ACCESS] }]);
-      paths.access2rank = makePath([{ line: [ACCESS, RANK] }]); paths.local = makePath(local);
-      paths.back = makePath([...reverseSegments(local), ...reverseSegments(inside), ...reverseSegments(paths.sendSegments)]);
+      const inside = [INLET, SEARCH, ACCESS, RANK], local = k.localRoute(RANK);
+      [paths.inlet2search, paths.search2access, paths.access2rank] = k.legs(inside);
+      paths.local = makePath(local); paths.back = k.returnPath(local, inside);
     }
 
     // ─── Pose ───
@@ -257,7 +235,7 @@ window.ZaglobaStations = {
         }
         else if (id === "model") {
           if (skipped) { pos = v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); red = 1; lock = true; }
-          else if (r >= 0) { const u = ease(phase(t, 0.05 + r * 0.04, 0.38)); pos = podiumPos(r).lerp(v3(GPU_IN), u); scale = 1 - 0.97 * ease(phase(t, 0.28, 0.4)); }
+          else if (r >= 0) { const u = ease(phase(t, 0.05 + r * 0.04, 0.38)); pos = podiumPos(r).lerp(v3(GPU_IN), u); scale = k.swallowScale(id, t); }
           else vis = false;
         }
         plan[cid] = { pos, vis: vis && scale > 0.04, scale, red, lock };
@@ -267,14 +245,10 @@ window.ZaglobaStations = {
     function pose(s, dt, { o }) {
       const id = s.sceneId, t = s.t, d = s.decision, p = s.prompt;
       // sheet position inside the server and back
-      let pos = null, carrier = null, node = "none";
-      const at = (path, u) => path.getPointAt(clamp(u));
-      if (id === "search") { pos = at(paths.inlet2search, ease(phase(t, 0.2, 0.4))); carrier = "packet"; node = t >= 0.4 ? "search" : "moving"; }
-      else if (id === "access") { pos = at(paths.search2access, ease(phase(t, 0, 0.25))); carrier = "packet"; node = t >= 0.25 ? "access" : "moving"; }
-      else if (id === "rank") { pos = at(paths.access2rank, ease(phase(t, 0, 0.2))); carrier = "packet"; node = t >= 0.2 ? "rank" : "moving"; }
-      else if (id === "model") { pos = at(paths.local, ease(phase(t, 0, 0.4))); carrier = "packet"; node = t >= 0.4 ? "local" : "moving"; }
-      else if (id === "return") { pos = at(paths.back, ease(phase(t, 0, 0.82))); carrier = "answer"; node = t >= 0.82 ? "desk" : "moving"; }
-      const scale = id === "model" ? 1 - 0.97 * ease(phase(t, 0.28, 0.4)) : id === "return" ? 0.03 + 0.97 * ease(phase(t, 0.02, 0.14)) : 1;
+      const ride = id === "search" ? k.ride(paths.inlet2search, t, 0.2, 0.4, "search") : id === "access" ? k.ride(paths.search2access, t, 0, 0.25, "access")
+        : id === "rank" ? k.ride(paths.access2rank, t, 0, 0.2, "rank") : id === "model" ? k.ride(paths.local, t, 0, 0.4, "local")
+        : id === "return" ? k.ride(paths.back, t, 0, 0.82, "desk", "answer") : null;
+      const pos = ride && ride.pos, scale = k.swallowScale(id, t);
       // keywords highlighted on the question while searching (keyword half of the hybrid search)
       const kw = (id === "search" && t > 0.45) || (o > order("search") && o <= order("model"));
       refs.msgMarks.forEach(mk => paintMark(mk, kw ? "keyword" : "none"));
@@ -332,7 +306,7 @@ window.ZaglobaStations = {
           : d.outcome === "nodata" ? ["brak wystarczających informacji – bez odpowiedzi spekulatywnej", "danger"] : ["do odpowiedzi: " + d.ranked.length + " najtrafniejsze dokumenty", "ok"];
         mv = { view: "results", rows, status: status[0], tone: status[1] };
       }
-      drawMonitor(mv); info.monitorView = mv.view;
+      refs.drawMonitor(mv); info.monitorView = mv.view;
       // connectors: lamps blink while syncing; pulses travel down the pipes in the admin scene and for the fresh document
       const syncing = id === "admin" || (freshId && id === "search" && t < 0.3);
       refs.pipeGlow.opacity = syncing ? 0.9 : 0; refs.pipeGlow.emissiveIntensity = syncing ? 1.2 : 0;
@@ -342,19 +316,10 @@ window.ZaglobaStations = {
         pulse.visible = on; if (on) pulse.position.copy(refs.pipes[sid].getPointAt(((t * 1.6) + i / 3) % 1));
       });
       for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = id === "admin" || (sid === "sharepoint" && syncing) ? 1.2 : 0;
-      // local model at work: the chosen server slides out, takes question + sources in, its LED works (amber when abstaining)
-      const work = id === "model" ? phase(t, 0.4, 0.55) : id === "return" ? 1 - phase(t, 0, 0.3) : 0;
-      const slide = id === "model" ? ease(phase(t, 0.05, 0.25)) * (1 - ease(phase(t, 0.5, 0.65))) : id === "return" ? 1 - ease(phase(t, 0.3, 0.42)) : 0;
-      const abstain = d && d.outcome === "nodata";
-      refs.blades.forEach((b, i) => {
-        const chosen = i === CAB.chosen;
-        b.g.position.z = CAB.z + (chosen ? slide * 0.3 : 0);
-        const c = colors[chosen && abstain && work > 0 ? "srcC" : "gpuLed"]; b.led.color.set(c); b.led.emissive.set(c);
-        b.led.emissiveIntensity = chosen ? 0.15 + Math.max(work, id === "model" && t > 0.4 ? 1 : 0) * 1.6 : 0.15 + 0.1 * (i % 2);
-      });
-      info.blade = +slide.toFixed(2);
+      // local model at work: takes question + sources in, its LED works (amber when abstaining)
+      k.poseCabinet(refs.blades, id, t, { ledTone: d && d.outcome === "nodata" ? "srcC" : "gpuLed" });
       refs.gateMat.emissiveIntensity = id === "admin" ? 0.8 : 0;
-      return pos ? { pos, carrier, scale, node } : { node: "none" };
+      return ride ? { ...ride, scale } : { node: "none" };
     }
 
     // ─── Camera, labels, diagnostics ───

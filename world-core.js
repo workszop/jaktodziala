@@ -13,18 +13,22 @@ window.WorldCore = (() => {
   const CORE_COLORS = ["paper", "cream", "ink", "wood", "metal", "upholstery", "pot", "soil", "leaf", "leafLight", "screen", "wall", "wallServer",
     "glass", "foundation", "edge", "officeFloor", "serverFloor", "tileLine", "background", "light", "sky", "bounce", "brand", "admin", "accent",
     "accentTint", "rack", "rackDark", "rackFace", "rackLine", "belt", "scan", "gpu", "gpuLed", "cloud", "hazard", "ok", "danger", "chipMasked",
-    "cable", "keyboard", "lockMetal", "rug"];
+    "cable", "keyboard", "lockMetal", "rug", "xrayBg", "xrayLine"];
+  // The local route leaves the last station (x 10.9) for a turn in front of the GPU server cabinet, runs along it, then into the chosen server.
+  const LOCAL_TURN = [11.45, 3.45], CAB = { x: 12.25, z: 2.75, chosen: 1 };
   // Shared geometry. The sheet's centre rides RIDE high inside the rack and FLOOR_RIDE above the floor cable (half-height ~0.16).
   const G = {
     FLOOR: 0.02, BELT_Y: 0.33, RIDE: 0.48, FLOOR_RIDE: 0.23, LANE_Z: 0.55, HOLE_TOP: 0.74, PORT_W: 0.44, PORT_Z: 1.74,
     DESK: { x: 2.6, z: 2.25 }, STAND: [2.6, 3.0], DOOR: [0.8, 5.6], MON: [2.6, 0.99, 2.24], ADMIN: { x: 5.9, z: 4.15 },
-    INLET: [8.58, 0.48, 2.8], RACK: { cx: 10.6, cz: 2.8, w: 4.6, d: 2.2, h: 1.1 }, GATE: [11.25, 0.48, 0.06], GATE_X: [10.92, 11.58]
+    INLET: [8.58, 0.48, 2.8], RACK: { cx: 10.6, cz: 2.8, w: 4.6, d: 2.2, h: 1.1 }, GATE: [11.25, 0.48, 0.06], GATE_X: [10.92, 11.58],
+    LOCAL_TURN, CAB, GPU_IN: [12.25, 0.49, 2.95], LOCAL_RAILS: [[[11.08, 2.98], LOCAL_TURN], [LOCAL_TURN, [CAB.x - 0.3, LOCAL_TURN[1]]]]
   };
   const BASE_SHOTS = {
     over: { target: [7.2, 1.0, 1.8], span: 8.4, angle: 0.62, elev: 0.6 },
     monitor: { target: [2.6, 0.97, 2.1], span: 1.2, angle: 0.22, elev: 0.3 },
     rackOut: { target: [10.5, 0.6, 2.7], span: 3.9, angle: 0.62, elev: 0.6 },
-    admin: { target: [5.9, 1.02, 4.05], span: 1.15, angle: 0.18, elev: 0.28 }
+    admin: { target: [5.9, 1.02, 4.05], span: 1.15, angle: 0.18, elev: 0.28 },
+    gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 }
   };
   const BASE_LABELS = [
     { id: "desk", text: "Stanowisko pracownika", color: "brand", pos: [2.6, 1.5, 2.1], scenes: ["login", "send", "final"] },
@@ -39,12 +43,13 @@ window.WorldCore = (() => {
 
   function create(product) {
     const P = product.config;
-    const SCENE_ORDER = P.sceneOrder, SHOTS = { ...BASE_SHOTS, ...P.shots }, LABELS = [...BASE_LABELS, ...P.labels], ANCHORS = { server: [10.6, 1.2, 3.4], ...P.anchors };
+    const SCENE_ORDER = P.sceneOrder, SHOTS = { ...BASE_SHOTS, ...P.shots }, LABELS = [...BASE_LABELS, ...P.labels], ANCHORS = { server: [10.6, 1.2, 3.4], local: [12.25, 1.1, 2.95], ...P.anchors };
     const COLOR_KEYS = [...new Set([...CORE_COLORS, ...(P.colorKeys || [])])];
 
     // ─── State ───
     let THREE = null, renderer, scene, camera, world, stage, labelsEl, resizeObserver, sun, S = null;
     let width = 1, height = 1, options = {};
+    const fonts = { ui: "sans-serif", mono: "monospace" }; // resolved from --font-ui / --font-mono in init
     const colors = {}, materials = {}, geometries = new Map(), refs = {}, paths = {};
     const view = { target: null, span: 8.4, angle: 0.62, elev: 0.6 };
     const user = { yaw: 0, zoom: 1, drag: null };
@@ -60,6 +65,8 @@ window.WorldCore = (() => {
     const lerp = (a, b, k) => a + (b - a) * k;
     const v3 = p => new THREE.Vector3(p[0], p[1], p[2]);
     const order = id => SCENE_ORDER.indexOf(id);
+    // A canvas font string from the UI or mono token, e.g. font(700, 34) or font(500, 24, true).
+    const font = (weight, px, mono = false) => weight + " " + px + "px " + (mono ? fonts.mono : fonts.ui);
 
     function material(name) {
       if (materials[name]) return materials[name];
@@ -272,16 +279,19 @@ window.WorldCore = (() => {
         drawQ(c, W / 2 - 96, 38, 180);
         c.fillStyle = colors.scan; c.fillRect(34, 70, 10, 110);
         c.fillStyle = colors.ink; c.fillRect(W - 300, H - 70, 262, 44);
-        c.fillStyle = colors.paper; c.font = "600 26px " + (options.font || "sans-serif"); c.fillText("Quantica AI Server", W - 286, H - 39);
+        c.fillStyle = colors.paper; c.font = font(600, 26); c.fillText("Quantica AI Server", W - 286, H - 39);
       });
       const side = own("rackFace", { transparent: true, opacity: 1 }), front = own("paper", { map: face, transparent: true, opacity: 1 });
       refs.frontMats = [side, side, side, side, front, side];
       refs.front = mesh(geo("box", [w + 0.02, h, 0.06], () => new THREE.BoxGeometry(w + 0.02, h, 0.06)), refs.frontMats);
       refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01);
+      // the belt from the inlet, and two spare racks behind the GPU bay
+      belt(8.475, 10.925);
+      for (const x of [13.55, 13.9]) box(x, 0.6, 0.32, 0.7, 1.0, "rack", FLOOR, world, 0.02);
     }
     // A monitor or board perched on the rack's back panel: a clamp over the panel's top edge and a neck under the screen's centre,
-    // so the screen can turn towards the viewer without its mount leaving the panel. Products add the face at (0, H / 2, 0.03).
-    function rackMonitor(x, W, H, rot = 0.32) {
+    // so the screen can turn towards the viewer without its mount leaving the panel. The face (faceMat on a W × H plane) sits in the frame.
+    function rackMonitor(x, W, H, rot, faceMat) {
       const { FLOOR, RACK } = G, top = FLOOR + RACK.h, wallZ = RACK.cz - RACK.d / 2 + 0.04, lift = 0.17;
       box(x, wallZ, 0.24, 0.14, 0.03, "rackDark", top, world, 0.01);
       for (const dz of [-0.065, 0.065]) box(x, wallZ + dz, 0.24, 0.012, 0.09, "rackDark", top - 0.06);
@@ -289,7 +299,41 @@ window.WorldCore = (() => {
       const g = group(x, top + lift, wallZ); g.rotation.y = rot;
       box(0, -0.035, 0.16, 0.05, 0.1, "metal", -0.01, g);
       box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), faceMat); face.position.set(0, H / 2, 0.03); g.add(face);
       return g;
+    }
+    // Live preview screen on the rack: a mono title and divider on the screen background; the product draws the body.
+    // Returns update(state), which redraws only when the state changed.
+    function rackScreen(x, title, drawBody) {
+      const tex = canvasTexture(1024, 610, () => {}), c = tex.image.getContext("2d"), { width: W, height: H } = tex.image;
+      rackMonitor(x, 1.3, 0.775, 0.32, new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+      let last = "";
+      return st => {
+        const key = JSON.stringify(st); if (key === last) return; last = key;
+        c.fillStyle = colors.xrayBg; c.fillRect(0, 0, W, H);
+        c.fillStyle = colors.xrayLine; c.font = font(700, 30, true); c.fillText(title, 30, 48);
+        c.globalAlpha = 0.25; c.fillRect(30, 64, W - 60, 2); c.globalAlpha = 1;
+        drawBody(c, st, W, H); tex.needsUpdate = true;
+      };
+    }
+    // Static board on the rack: an admin header bar, then one framed row per item (drawRow(c, row, y, w, i) fills it in).
+    // rowY(i) is a row's centre height in g, for lamps and highlights.
+    function rackBoard(x, title, rows, drawRow) {
+      const W = 1.56, H = 0.66, TH = 432, rowPx = i => 140 + i * 104;
+      const tex = canvasTexture(1024, TH, (c, w) => {
+        c.fillStyle = colors.rackFace; c.fillRect(0, 0, w, TH);
+        c.fillStyle = colors.admin; c.fillRect(0, 0, w, 74);
+        c.fillStyle = colors.paper; c.font = font(700, 34); c.fillText(title, 32, 49);
+        rows.forEach((row, i) => { const y = rowPx(i); c.strokeStyle = colors.rackLine; c.lineWidth = 2; c.strokeRect(20, y - 44, w - 40, 88); drawRow(c, row, y, w, i); });
+      });
+      const g = rackMonitor(x, W, H, 0, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+      return { g, W, H, rowY: i => H / 2 - (rowPx(i) - TH / 2) / TH * H };
+    }
+    // A padlock: a body and a half-ring shackle, scaled by size.
+    function padlock(x, y, z, tone, size = 1, parent = world) {
+      const lock = group(x, y, z, parent); box(0, 0, 0.11 * size, 0.05 * size, 0.09 * size, tone, -0.045 * size, lock, 0.015 * size);
+      const shackle = new THREE.Mesh(geo("lockArc", [size], () => new THREE.TorusGeometry(0.035 * size, 0.01 * size, 8, 16, Math.PI)), material(tone));
+      shackle.position.y = 0.045 * size; lock.add(shackle); return lock;
     }
     // Belt from the inlet along the rack's centre line.
     function belt(x0, x1) {
@@ -304,8 +348,8 @@ window.WorldCore = (() => {
         const tex = canvasTexture(512, 192, (c, w, h) => {
           c.fillStyle = colors.rackFace; c.fillRect(0, 0, w, h);
           c.fillStyle = colors[tone]; c.fillRect(0, 0, 14, h); c.beginPath(); c.arc(86, h / 2, 52, 0, Math.PI * 2); c.fill();
-          c.fillStyle = colors.paper; c.font = "700 64px " + (options.font || "sans-serif"); c.fillText(n, 68, h / 2 + 23);
-          c.font = "700 " + (title.length > 13 ? 40 : 46) + "px " + (options.font || "sans-serif"); c.fillText(title, 160, h / 2 + 16, w - 170);
+          c.fillStyle = colors.paper; c.font = font(700, 64); c.fillText(n, 68, h / 2 + 23);
+          c.font = font(700, title.length > 13 ? 40 : 46); c.fillText(title, 160, h / 2 + 16, w - 170);
         });
         const plate = new THREE.Mesh(geo("plane", [0.72, 0.27], () => new THREE.PlaneGeometry(0.72, 0.27)), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
         plate.rotation.x = -Math.PI / 2; plate.position.set(x, G.FLOOR + 0.125, 3.52); plate.receiveShadow = true; world.add(plate);
@@ -322,12 +366,41 @@ window.WorldCore = (() => {
         box(0, 0, 0.7, 0.6, 0.16, "gpu", 0, g, 0.02);
         const led = own("gpuLed", { emissive: colors.gpuLed, emissiveIntensity: 0.15 });
         box(0, 0.302, 0.62, 0.01, 0.025, led, 0.02, g);
-        const tex = canvasTexture(512, 64, (c, w) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, 64); c.fillStyle = colors.rackLine; c.font = "700 34px " + (options.font || "sans-serif"); c.textAlign = "center"; c.fillText(label + " " + (i + 1), w / 2, 44); });
+        const tex = canvasTexture(512, 64, (c, w) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, 64); c.fillStyle = colors.rackLine; c.font = font(700, 34); c.textAlign = "center"; c.fillText(label + " " + (i + 1), w / 2, 44); });
         const lab = new THREE.Mesh(geo("plane", [0.6, 0.075], () => new THREE.PlaneGeometry(0.6, 0.075)), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); lab.position.set(0, 0.11, 0.304); g.add(lab);
         // the chosen server swallows the sheet, so it is exempt from the collision check
         if (i === chosen) g.traverse(o => { o.userData.noCollide = true; });
         return { g, led, z };
       });
+    }
+    // The local GPU bay: rails from the last station to the cabinet, and the cabinet itself. Returns its blades.
+    function localBay() {
+      for (const [a, b] of G.LOCAL_RAILS) strip(a, b, 0.2, 0.04, "belt", G.FLOOR + 0.12);
+      return serverCabinet(G.CAB);
+    }
+    // Segments of the local route from the last station into the chosen server.
+    const localRoute = from => [{ line: [from, [LOCAL_TURN[0], G.RIDE, LOCAL_TURN[1]], [CAB.x, G.RIDE, LOCAL_TURN[1]], G.GPU_IN] }];
+    // Straight legs between consecutive stations, e.g. legs([INLET, A, B]) → [INLET→A, A→B].
+    const legs = pts => pts.slice(1).map((p, i) => makePath([{ line: [pts[i], p] }]));
+    // Way back for the answer: the outbound segments, the stations (inside, a point list) and the send path, all reversed.
+    const returnPath = (out, inside) => makePath([...reverseSegments(out), ...reverseSegments([{ line: inside }]), ...reverseSegments(paths.sendSegments)]);
+
+    // ─── Pose helpers for products ───
+    // The sheet rides `path` between t = a and b, then rests at `node`.
+    const ride = (path, t, a, b, node, carrier = "packet") => ({ pos: path.getPointAt(clamp(ease(phase(t, a, b)))), carrier, node: t >= b ? node : "moving" });
+    // The chosen GPU server swallows the sheet (model) and hands back the answer (return).
+    const swallowScale = (id, t) => (id === "model" ? 1 - 0.97 * ease(phase(t, 0.28, 0.4)) : id === "return" ? 0.03 + 0.97 * ease(phase(t, 0.02, 0.14)) : 1);
+    // Local model at work: the chosen server slides out, takes the sheet in, its LED works (in ledTone). Inactive = the route went elsewhere.
+    function poseCabinet(blades, id, t, { active = true, ledTone = "gpuLed" } = {}) {
+      const work = !active ? 0 : id === "model" ? phase(t, 0.4, 0.55) : id === "return" ? 1 - phase(t, 0, 0.3) : 0;
+      const slide = !active ? 0 : id === "model" ? ease(phase(t, 0.05, 0.25)) * (1 - ease(phase(t, 0.5, 0.65))) : id === "return" ? 1 - ease(phase(t, 0.3, 0.42)) : 0;
+      blades.forEach((b, i) => {
+        const chosen = i === CAB.chosen, c = colors[chosen && work > 0 ? ledTone : "gpuLed"];
+        b.g.position.z = b.z + (chosen ? slide * 0.3 : 0); b.led.color.set(c); b.led.emissive.set(c);
+        b.led.emissiveIntensity = chosen ? 0.15 + Math.max(work, active && id === "model" && t > 0.4 ? 1 : 0) * 1.6 : 0.15 + 0.1 * (i % 2);
+      });
+      info.blade = +slide.toFixed(2);
+      return slide;
     }
 
     // ─── Build: clouds outside the building (external models or data sources) ───
@@ -384,7 +457,7 @@ window.WorldCore = (() => {
         c.fillStyle = colors.paper; c.fillRect(0, 0, w, PDF.tex[1]);
         c.fillStyle = colors.cream; c.beginPath(); c.moveTo(w - 54, 0); c.lineTo(w, 54); c.lineTo(w - 54, 54); c.closePath(); c.fill();
         c.fillStyle = colors.danger; c.beginPath(); if (c.roundRect) c.roundRect(18, 22, 86, 40, 8); else c.rect(18, 22, 86, 40); c.fill();
-        c.fillStyle = colors.paper; c.font = "800 26px " + (options.font || "sans-serif"); c.fillText("PDF", 33, 52);
+        c.fillStyle = colors.paper; c.font = font(800, 26); c.fillText("PDF", 33, 52);
         c.fillStyle = colors.rackLine; layout = fakeText(c, 20, 104, w - 40, 6, 36, 11, seeded(seed));
       });
       return { tex, layout };
@@ -666,7 +739,7 @@ window.WorldCore = (() => {
         finally { clearTimeout(timer); }
         const css = getComputedStyle(document.documentElement);
         for (const k of COLOR_KEYS) colors[k] = css.getPropertyValue("--world-" + k).trim() || css.getPropertyValue("--world-paper").trim();
-        options.font = css.getPropertyValue("--font-ui").trim();
+        fonts.ui = css.getPropertyValue("--font-ui").trim() || "sans-serif"; fonts.mono = css.getPropertyValue("--font-mono").trim() || "monospace";
         if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
@@ -686,9 +759,10 @@ window.WorldCore = (() => {
         ground.rotation.x = -Math.PI / 2; ground.position.y = -0.25; ground.receiveShadow = true; scene.add(ground);
         world = new THREE.Group(); scene.add(world); scratch = new THREE.Vector3();
         S = product.create({
-          THREE, G, colors, refs, paths, info, options, world,
-          clamp, phase, ease, easeOutBack, lerp, v3, order, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture,
-          makePath, reverseSegments, seeded, fakeText, paintMark, belt, plates, serverCabinet, rackMonitor, deskAt, chair, plant
+          THREE, G, colors, refs, paths, info, world,
+          clamp, phase, ease, easeOutBack, lerp, v3, order, font, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture,
+          makePath, seeded, fakeText, paintMark, plates, rackScreen, rackBoard, padlock, localBay, localRoute, legs, returnPath,
+          ride, swallowScale, poseCabinet, deskAt, chair, plant
         });
         buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();
         S.build(); S.buildPaths();

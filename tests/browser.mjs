@@ -32,6 +32,8 @@ const noOverflow = p => p.evaluate(() => document.documentElement.scrollWidth <=
 async function playthrough(p, key, prefix = "") {
   const seen = [];
   for (let i = 0; i < 14; i++) {
+    // the contract updates on the key event, the world publishes its packet on the next frame: give it a moment to catch up
+    await p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.packet === "moving" || s.worldPacket === s.packet; }, null, { timeout: 2000 }).catch(() => {});
     const d = await data(p); seen.push(d.scene);
     if (d.packet !== "moving" && d.worldPacket !== d.packet) check(prefix + "world packet at " + d.scene, false, d.worldPacket + " ≠ " + d.packet);
     if (d.scene === "final") break;
