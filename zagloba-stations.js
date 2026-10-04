@@ -34,7 +34,7 @@ window.ZaglobaStations = {
       { id: "s3", text: "Amazon S3", color: "srcC", pos: [13.5, 3.95, -2.7], scenes: ["send", "admin", "final"] }
     ],
     anchors: {
-      search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], podium: [11.2, 0.75, 2.3], sharepoint: [9.0, 3.5, -2.7]
+      search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], podium: [11.2, 0.75, 2.3]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server z bazą wiedzy i źródła danych organizacji. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
   },
@@ -80,7 +80,6 @@ window.ZaglobaStations = {
           c.fillStyle = colors.paper; c.fillRect(0, 0, w, h);
           c.fillStyle = colors[tone]; c.fillRect(0, 0, w, 26);
           c.fillStyle = colors.rackLine; fakeText(c, 16, 60, w - 32, 6, 30, 8, seeded(id.length * 13));
-          if (doc.fresh) { c.fillStyle = colors.ok; c.fillRect(w - 70, 34, 60, 22); c.fillStyle = colors.paper; c.font = font(800, 15); c.fillText("NOWY", w - 62, 50); }
         });
         const g = group(...refs.slots[id]);
         const tint = own("paper", { map: tex, emissive: colors.paper, emissiveIntensity: 0, side: THREE.DoubleSide, transparent: true });
@@ -262,8 +261,6 @@ window.ZaglobaStations = {
         const a = v3([SEARCH[0], RIDE + 0.1, SEARCH[2]]), z = v3(refs.slots[cid]), mid = a.clone().add(z).multiplyScalar(0.5), len = a.distanceTo(z);
         b.position.copy(mid); b.scale.set(1, len, 1); b.quaternion.setFromUnitVectors(v3([0, 1, 0]), z.clone().sub(a).normalize());
       });
-      // a fresh document arrives through its source's pipe at the start of the search
-      const freshId = d && d.fresh.length ? d.fresh[0] : null, freshSrc = freshId ? Z.DOCS[freshId].source : null;
       // cards
       const sheetX = pos ? pos.x : SEARCH[0], plan = d ? cardPlan(s, d, sheetX) : {};
       let shownCandidates = 0, inTray = 0, onPodium = 0;
@@ -271,16 +268,8 @@ window.ZaglobaStations = {
         const card = refs.cards[cid], pl = plan[cid];
         let cpos = v3(refs.slots[cid]), vis = true, sc = 1, red = 0, lock = false;
         if (pl) ({ pos: cpos, vis, scale: sc, red, lock } = pl);
-        // the changed document only reaches the index through the sync pipe during this search
-        if (cid === freshId && o < order("search")) vis = false;
-        else if (cid === freshId && id === "search" && t < 0.3) {
-          const pipe = refs.pipes[freshSrc];
-          cpos = t < 0.22 ? pipe.getPointAt(clamp(ease(phase(t, 0, 0.22)))) : pipe.getPointAt(1).lerp(v3(refs.slots[cid]), ease(phase(t, 0.22, 0.3)));
-          sc = t < 0.22 ? 2.2 : lerp(2.2, 1, ease(phase(t, 0.22, 0.3)));
-        }
         card.g.position.copy(cpos); card.g.visible = vis; card.g.scale.setScalar(sc); card.g.rotation.set(-0.25, 0.25, 0);
-        const arriving = cid === freshId && id === "search" && t < 0.3;
-        card.tint.emissive.set(colors[red ? "danger" : arriving ? "accent" : "paper"]); card.tint.emissiveIntensity = red ? 0.5 : arriving ? 0.6 : 0; card.lock.visible = lock;
+        card.tint.emissive.set(colors[red ? "danger" : "paper"]); card.tint.emissiveIntensity = red ? 0.5 : 0; card.lock.visible = lock;
         if (pl && id === "search" && t > 0.75) shownCandidates++;
         if (pl && lock && (id === "access" || id === "rank")) inTray++;
         if (pl && id === "rank" && t >= 1 && d.ranked.includes(cid)) onPodium++;
@@ -304,15 +293,15 @@ window.ZaglobaStations = {
         mv = { view: "results", rows, status: status[0], tone: status[1] };
       }
       refs.drawMonitor(mv); info.monitorView = mv.view;
-      // connectors: lamps blink while syncing; pulses travel down the pipes in the admin scene and for the fresh document
-      const syncing = id === "admin" || (freshId && id === "search" && t < 0.3);
+      // connectors: lamps blink and pulses travel down the pipes while syncing in the admin scene
+      const syncing = id === "admin";
       refs.pipeGlow.opacity = syncing ? 0.9 : 0; refs.pipeGlow.emissiveIntensity = syncing ? 1.2 : 0;
       refs.srcLamps.forEach((m, i) => { m.emissiveIntensity = syncing ? 0.8 + 0.6 * Math.abs(Math.sin(t * 20 + i)) : 0.3; });
       refs.pipePulses.forEach((pulse, i) => {
         const sid = Z.SOURCE_IDS[i], on = id === "admin";
         pulse.visible = on; if (on) pulse.position.copy(refs.pipes[sid].getPointAt(((t * 1.6) + i / Z.SOURCE_IDS.length) % 1));
       });
-      for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = id === "admin" || (sid === freshSrc && syncing) ? 1.2 : 0;
+      for (const sid of Z.SOURCE_IDS) refs.cloudMats[sid].emissiveIntensity = syncing ? 1.2 : 0;
       // local model at work: takes question + sources in, its LED works (amber when abstaining)
       k.poseCabinet(id, t, { ledTone: d && d.outcome === "nodata" ? "srcC" : "gpuLed" });
       refs.gateMat.emissiveIntensity = id === "admin" ? 0.8 : 0;
@@ -322,7 +311,7 @@ window.ZaglobaStations = {
     // ─── Camera, labels, diagnostics ───
     function shot(s, poseOut, follow, SHOTS) {
       const id = s.sceneId, t = s.t;
-      if (id === "search") return t < 0.3 ? (s.decision && s.decision.fresh.length && t > 0.02 ? SHOTS.sources : SHOTS.rackOut) : SHOTS.search;
+      if (id === "search") return t < 0.3 ? SHOTS.rackOut : SHOTS.search;
       if (id === "access") return SHOTS.access;
       if (id === "rank") return SHOTS.rank;
       if (id === "model") return SHOTS.gpu;

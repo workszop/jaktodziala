@@ -13,7 +13,7 @@ Open `index.html` (the home page), `klara.html` or `zagloba.html` directly, or s
 **URL parameters** (both apps):
 
 - `?scene=<id>` opens a scene, shown finished and step by step; scenes after the chat need a `prompt`. Add `&play=1` to play it from its start instead.
-- `?prompt=<id>` – Klara: `sensitive|routine|complex|attachment`; Zagłoba: `procedure|nodata|fresh`.
+- `?prompt=<id>` – Klara: `sensitive|routine|complex|attachment`; Zagłoba: `procedure|nodata`.
 - The admin setting – Klara: `?policy=apiq|frontier|off`; Zagłoba: `?access=board` (access to the board folder granted). A restart (`R` / *Od nowa* / *Zacznij od nowa*) and the self-test start from it again; a deep-linked run (`?scene=…&prompt=…`) keeps the setting it opened with when the setting is changed later (the change applies to the next run).
 - `?auto=0` (start step by step) · `?auto=1` (Auto even with a deep link) · `?speed=0.25–4` (animation speed, clamped) · `?selftest=1` (starts step by step and runs the self-test once the renderer is ready; the result lands in `data-test`).
 
@@ -45,14 +45,14 @@ The journey of a question through **Zagłoba – inteligentny asystent wiedzy** 
 | # | Scene | What happens |
 |---|---|---|
 | 01 | Pulpit i logowanie | Login with an organisation account – the user's role and access rights come with it. |
-| 02 | Pytanie | 3 questions: a procedure (one matching document sits in the board folder) · no coverage · a document changed yesterday. |
+| 02 | Pytanie | 2 questions: a procedure (one matching document sits in the board folder) · no coverage. |
 | 03 | Wysyłka | The question rides the cable to the server; Zagłoba can run fully on-premise. |
-| 04 | Wyszukiwanie | Hybrid search over the knowledge index (shelves synced with SharePoint, OneDrive, Amazon S3): keyword highlights on the sheet, beams to the candidate documents. For question 4 the changed document first arrives through the SharePoint sync pipe. |
+| 04 | Wyszukiwanie | Hybrid search over the knowledge index (shelves synced with SharePoint, OneDrive, Amazon S3): keyword highlights on the sheet, beams to the candidate documents. |
 | 05 | Uprawnienia | A badge gate checks every candidate; a document from the board folder is stopped, locked and dropped into the "skipped" tray. |
 | 06 | Trafność | Re-ranking: the most relevant documents climb a podium (top 3), weak ones fade. |
 | 07 | Model | The local model (GPU server cabinet) answers only from the selected fragments – or abstains when the base has no coverage and names the right source. |
 | 08 | Odpowiedź | The answer in the chat with citation cards [1] [2] … |
-| 09 | Panel | Data sources with background sync, and the user's access to the board folder – grant it and ask question 2 again. |
+| 09 | Panel | Data sources with background sync, and the user's access to the board folder – grant it and ask question 1 again. |
 | 10 | Podsumowanie | Runs and the five benefits from the product page. |
 
 Invariant: a document the user cannot read is never cited (`tests/zagloba.cjs` + `App.probe`).

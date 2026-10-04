@@ -26,8 +26,6 @@
       if (id === "send" && t > 0.85) out.push({ id: "server", anchor: "server", side: "top", tone: "brand", kicker: "Quantica AI Server", title: "Zagłoba działa w organizacji",
         lines: [{ text: "pytanie dotarło do serwera organizacji", state: "ok" }, { text: "dokumenty i dane nie trafiają do zewnętrznych dostawców AI", state: "on" }] });
       if (id === "search") {
-        if (d.fresh.length && t > 0.02 && t < 0.32) out.push({ id: "sync", anchor: "sharepoint", side: "right", tone: "accent", kicker: "Synchronizacja w tle", title: "Nowy dokument w indeksie",
-          lines: [{ text: docTitle(d.fresh[0]), state: "on" }, { text: "zmieniony w SharePoint – uwzględniony automatycznie", state: "ok" }, { text: "bez przenoszenia do nowego repozytorium", state: "muted" }] });
         if (t > 0.45) out.push({ id: "search", anchor: "search", side: "right", tone: "accent", kicker: "Krok 1 · Wyszukiwanie hybrydowe", title: t > 0.75 ? "Znaleziono " + d.candidates.length + " dokumenty" : "Przeszukiwanie bazy wiedzy…",
           lines: [{ text: "semantyczne: znaczenie pytania", state: "on" }, { text: "słowa kluczowe: wyróżnione na kartce", state: "on" }, ...(t > 0.75 ? d.candidates.map(cid => ({ text: docTitle(cid), state: "muted" })) : [])] });
       }
@@ -45,9 +43,8 @@
       return out;
     },
 
-    // Flow extras on top of the core's packet path: the sync pulse from the sources and the answer node.
+    // Flow extras on top of the core's packet path: the answer node.
     flowStates(c, st, id, t, d) {
-      if (id === "search" && d && d.fresh.length && t < 0.3) st.sources = "active";
       if (d && (c.IDX[id] > c.IDX.model || (id === "model" && t >= 0.5))) st.answer = d.outcome === "answer" ? "chosen" : "blocked";
     },
 
@@ -61,7 +58,7 @@
         case "send": return { lead: "Pytanie jedzie do Quantica AI Server w serwerowni organizacji. Zagłoba może działać w pełni lokalnie – bez przekazywania dokumentów zewnętrznym dostawcom AI.",
           bullets: ["Organizacja zachowuje kontrolę nad miejscem przechowywania i przetwarzania danych.", "Koszty nie zależą od liczby zapytań do komercyjnych modeli językowych."] };
         case "search": return { lead: "Zagłoba przeszukuje bazę wiedzy połączoną z SharePoint, OneDrive i Amazon S3. Wyszukiwanie jest hybrydowe: semantyczne (znaczenie) i po słowach kluczowych.",
-          bullets: [d.fresh.length ? "Dokument zmieniony wczoraj w SharePoint jest już w indeksie – synchronizacja uwzględnia nowe i zmienione dokumenty." : "Dokumenty zostają w swoich systemach – nie trzeba ich przenosić do kolejnego repozytorium.", "Znaleziono " + d.candidates.length + " dokumenty kandydujące."] };
+          bullets: ["Dokumenty zostają w swoich systemach – nie trzeba ich przenosić do kolejnego repozytorium.", "Znaleziono " + d.candidates.length + " dokumenty kandydujące."] };
         case "access": return d.skipped.length
           ? { lead: "Bramka sprawdza uprawnienia użytkownika do każdego znalezionego dokumentu. " + docTitle(d.skipped[0]) + " leży w folderze Zarządu – użytkownik nie ma do niego dostępu, więc dokument zostaje pominięty.",
             bullets: ["Zachowane są istniejące role i poziomy dostępu.", "Pominięty dokument nie trafi do odpowiedzi ani do przypisów."] }
@@ -167,7 +164,7 @@
       finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Jedno okno pytań dla pracownika. Odpowiedzi tylko z dokumentów, do których ma uprawnienia – ze wskazaniem źródeł.",
       tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", otherPrompt: "Inne pytanie", adminJump: "Zmień uprawnienia w panelu", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
     },
-    autoOrder: ["procedure", "nodata", "fresh"],
+    autoOrder: ["procedure", "nodata"],
     dwell: { search: 4.5, access: 4.5, rank: 4 },
     calloutScenes: ["search", "access", "rank", "model"],
     // the admin panel's one setting: the user's access to the board folder (?access=board, App.setAccess, data-board-access)

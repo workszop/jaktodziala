@@ -42,12 +42,6 @@ test("answer citation numbers exist: every [n] refers to a cited document", () =
   }
 });
 
-test("fresh document: synchronised yesterday and already cited", () => {
-  const d = Z.decide(Z.promptById("fresh"), {});
-  assert.deepStrictEqual([...d.fresh], ["zdalna"]);
-  assert.strictEqual(d.citations[0], "zdalna");
-});
-
 test("scenes and documents are consistent", () => {
   const ids = Z.SCENES.map(s => s.id); assert.strictEqual(new Set(ids).size, ids.length);
   for (const p of Z.PROMPTS) for (const [id] of p.candidates) assert.ok(Z.DOCS[id], id);

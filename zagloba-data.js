@@ -23,8 +23,7 @@
     obieg: { title: "Instrukcja obiegu dokumentów.docx", source: "sharepoint", access: "all" },
     cennik: { title: "Cennik kartonów klapowych 2026.xlsx", source: "onedrive", access: "all" },
     limity: { title: "Limity akceptacji reklamacji – Zarząd.pdf", source: "sharepoint", access: "board" },
-    delegacje: { title: "Regulamin delegacji 2026.pdf", source: "s3", access: "all" },
-    zdalna: { title: "Regulamin pracy zdalnej.docx", source: "sharepoint", access: "all", fresh: true }
+    delegacje: { title: "Regulamin delegacji 2026.pdf", source: "s3", access: "all" }
   };
 
   // Questions with retrieval candidates (semantic + keyword scores 0..1). `covered` = the base answers the question.
@@ -44,13 +43,6 @@
       candidates: [["delegacje", 0.71, 0.66], ["cennik", 0.22, 0.18]],
       covered: false, redirect: "dział finansowy",
       answer: "W bazie wiedzy nie ma informacji o zasadach na przyszły rok. Obowiązujące dziś zasady opisuje [1]. Właściwym źródłem informacji o zmianach jest dział finansowy."
-    },
-    {
-      id: "fresh", key: "3", label: "Nowy dokument",
-      text: "Co zmieniło się w regulaminie pracy zdalnej od października?",
-      candidates: [["zdalna", 0.94, 0.9], ["obieg", 0.3, 0.25]],
-      covered: true,
-      answer: "Od 1 października 2026 r. limit pracy zdalnej wynosi 2 dni w tygodniu, a wniosek składa się przez system kadrowy [1]."
     }
   ];
 
@@ -101,7 +93,7 @@
     return {
       outcome, candidates: candidates.map(c => c.id), skipped, ranked: ranked.map(c => c.id), dropped, citations, answer,
       scores: Object.fromEntries(candidates.map(c => [c.id, { semantic: c.semantic, keyword: c.keyword, score: c.score }])),
-      fresh: citations.filter(id => DOCS[id].fresh), redirect: prompt.redirect || null,
+      redirect: prompt.redirect || null,
       checks: [
         "przeszukiwanie bazy wiedzy: " + candidates.length + " dokumenty kandydujące",
         skipped.length ? "kontrola uprawnień: " + skipped.length + " dokument pominięty – brak uprawnień użytkownika" : "kontrola uprawnień: użytkownik ma dostęp do wyszukanych dokumentów",
