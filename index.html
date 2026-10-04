@@ -15,11 +15,9 @@ if (/[?&](scene|prompt|policy|auto|speed|selftest)=/.test(location.search)) loca
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
 <style>
-/* ─── Tokens: home (product accents mirror klara.html / zagloba.html) ─── */
+/* ─── Tokens: home (product accents --klara-* / --zagloba-* come from app.css) ─── */
 :root{
   --accent:var(--brand);--accent-deep:var(--brand-deep);--accent-tint:var(--brand-tint);
-  --klara-accent:#c2410c;--klara-deep:#9a3412;--klara-tint:#fdf0e8;--klara-mark:#fde2cf;
-  --zagloba-accent:#197d78;--zagloba-deep:#0f5a56;--zagloba-tint:#e8f5f2;--zagloba-mark:#c9ebe3;
   --fs-hero:clamp(28px,3.4vw,46px);--fs-card:clamp(22px,2.2vw,30px);
   --pad-x:4.5vw;--pad-y:clamp(18px,4vh,40px);
 }
@@ -30,7 +28,7 @@ if (/[?&](scene|prompt|policy|auto|speed|selftest)=/.test(location.search)) loca
 body{overflow:auto}
 .page{min-height:100%;display:grid;grid-template-rows:auto 1fr}
 .top .hint{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--chrome-muted);white-space:nowrap}
-.top .hint kbd{font-family:var(--font-mono);border:1px solid var(--chrome-line);border-radius:5px;padding:1px 6px;color:var(--chrome-ink)}
+.top .hint kbd{border:1px solid var(--chrome-line);border-radius:5px;padding:1px 6px;color:var(--chrome-ink)}
 .home{display:grid;grid-template-rows:auto 1fr auto;gap:var(--pad-y);padding:var(--pad-y) var(--pad-x)}
 
 /* ─── Intro ─── */
@@ -45,7 +43,7 @@ body{overflow:auto}
 .choices>li:nth-child(2){animation-delay:.08s}
 .choice{flex:1;display:flex;flex-direction:column;text-decoration:none;color:var(--ink);background:var(--surface-raised);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:var(--radius-lg);overflow:hidden;transition:var(--transition)}
 .choice:hover,.choice:focus-visible{border-color:var(--accent);box-shadow:var(--shadow-md);transform:translateY(-3px)}
-.choice:focus-visible{outline:3px solid var(--ring,var(--accent-mark));outline-offset:2px}
+.choice:focus-visible{outline:3px solid var(--accent-mark);outline-offset:2px}
 
 .shot{position:relative;flex:1;min-height:260px;margin:0;background:var(--world-background);overflow:hidden}
 .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 55%;display:block;transition:opacity .35s ease}
@@ -58,7 +56,7 @@ body{overflow:auto}
 .name h2{font-size:var(--fs-card);line-height:1.1;font-weight:900;letter-spacing:-.01em}
 .tag{font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .go{flex:none;display:flex;align-items:center;gap:10px}
-.go kbd{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--ink-mute);border:1px solid var(--line-2);border-radius:5px;padding:1px 7px}
+.go kbd{font-size:var(--fs-xs);color:var(--ink-mute);border:1px solid var(--line-2);border-radius:5px;padding:1px 7px}
 .go i{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--surface-raised)}
 .choice:hover .go i{background:var(--accent-deep)}
 .go svg{transition:transform var(--transition)}

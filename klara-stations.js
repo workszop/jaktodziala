@@ -6,7 +6,7 @@ window.KlaraStations = {
     sceneOrder: ["login", "chat", "send", "scan", "gauge", "route", "model", "return", "admin", "final"],
     openScene: "scan",
     travelScenes: ["scan", "gauge", "route", "model"],
-    colorKeys: ["providerA", "providerB", "providerC", "gaugeLow", "gaugeMid", "gaugeHigh", "blocked", "xrayShell", "xrayBg", "xrayLine", "sofa", "counter"],
+    colorKeys: ["providerA", "providerB", "providerC", "gaugeLow", "gaugeMid", "gaugeHigh", "xrayShell", "xrayBg", "xrayLine", "sofa", "counter"],
     // open-space office: a high strip of windows, a rug under the lounge
     office: { windows: { count: 4, w: 1.4, h: 0.36, y: 0.62 }, rug: [4.15, 4.6, 2.3, 1.8] },
     ports: [10.9, 11.5],
@@ -25,7 +25,6 @@ window.KlaraStations = {
       { id: "scan", text: "Skaner rentgenowy", color: "scan", pos: [9.2, 1.06, 2.8], scenes: ["scan"] },
       { id: "gauge", text: "Miernik złożoności", color: "accent", pos: [10.0, 1.18, 2.25], scenes: ["gauge"] },
       { id: "switch", text: "Zwrotnica", color: "accent", pos: [10.9, 0.8, 2.85], scenes: ["route"] },
-      { id: "policy", text: "Polityka organizacji", color: "admin", pos: [10.75, 2.03, 1.8], scenes: [] },
       { id: "local", text: "Modele lokalne · serwery GPU", color: "ok", pos: [12.25, 1.22, 2.75], scenes: ["route", "model", "final"], route: "local" },
       { id: "gate", text: "Wyjście z organizacji", color: "ok", pos: [11.25, 1.1, 0.06], scenes: ["route", "model", "final"] },
       { id: "apiq", text: "Quantica APIQ", color: "brand", pos: [9.3, 3.95, -2.7], scenes: ["model", "final"], route: "apiq" },
@@ -34,7 +33,7 @@ window.KlaraStations = {
     // Callout anchors share ids with labels: an active callout replaces the plain label.
     anchors: {
       monitor: [8.6, 1.74, 1.94], scan: [9.2, 0.9, 3.3], gauge: [10.27, 0.76, 2.34], switch: [10.9, 0.4, 2.8],
-      policy: [10.75, 1.99, 1.8], local: [12.25, 1.1, 2.95], gate: [11.25, 0.7, 0.06], apiq: [9.3, 3.5, -2.7], frontier: [13.2, 3.5, -2.7]
+      local: [12.25, 1.1, 2.95], gate: [11.25, 0.7, 0.06], apiq: [9.3, 3.5, -2.7], frontier: [13.2, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server i modele zewnętrzne. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
   },
@@ -46,6 +45,7 @@ window.KlaraStations = {
     const { box, cylinder, sphere, group, strip, own, mesh, geo, canvasTexture, makePath, reverseSegments, fakeText, seeded, paintMark } = k;
     const { clamp, phase, ease, easeOutBack, lerp, order } = k;
     const { FLOOR, RIDE, PORT_Z, GATE } = G;
+    const K = window.KlaraData;
     const SCAN = [9.2, RIDE, 2.8], GAUGE = [10.0, RIDE, 2.8], SWITCH = [10.9, RIDE, 2.8], GPU_IN = [12.25, 0.49, 2.95], INLET = G.INLET;
     const PORT_X = { apiq: 10.9, frontier: 11.5 };
     const CLOUD = { apiq: [9.3, 3.1, -2.7], frontier: [13.2, 3.1, -2.7] };
@@ -266,7 +266,7 @@ window.KlaraStations = {
         att: s.prompt && s.prompt.attachment && xv !== "idle" ? { name: s.prompt.attachment.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
       info.scanView = xv;
       // gauge needle
-      const level = d ? (d.level === "high" ? 0.66 : d.level === "routine" ? -0.62 : 0) : 0;
+      const level = d ? K.COMPLEXITY[d.level].needle : 0;
       let needle = NEEDLE_REST;
       if (id === "gauge") needle = NEEDLE_REST + (-level - NEEDLE_REST) * easeOutBack(phase(t, 0.3, 0.85));
       else if (o > order("gauge")) needle = -level;
@@ -302,7 +302,7 @@ window.KlaraStations = {
       const pulse = id === "scan" && t > 0.5 && t < 0.72 ? 0.5 * Math.abs(Math.sin(t * 60)) : 0;
       const state = show => (show ? (masked ? "masked" : "found") : "none");
       refs.msgMarks.forEach((mk, i) => paintMark(mk, state(found && i < promptCount), pulse));
-      const attachments = s.prompt ? (s.prompt.attachments || (s.prompt.attachment ? [s.prompt.attachment] : [])) : [];
+      const attachments = s.prompt && s.prompt.attachment ? [s.prompt.attachment] : [];
       const attCount = Math.max(0, total - promptCount);
       refs.pdfs.forEach((pdf, i) => { pdf.g.visible = i < attachments.length; pdf.marks.forEach((mk, n) => paintMark(mk, state(docRead && n < attCount), pulse)); });
       info.attachments = Math.min(attachments.length, refs.pdfs.length);
@@ -363,7 +363,6 @@ window.KlaraStations = {
       return "";
     }
     function collisionRuns() {
-      const K = window.KlaraData;
       return [["attachment", "apiq"], ["complex", "apiq"], ["complex", "frontier"], ["routine", "apiq"]].map(([pid, pol]) => {
         const prompt = K.promptById(pid); return { prompt, decision: K.decide(prompt, { external: pol }), label: pid + "/" + pol };
       });

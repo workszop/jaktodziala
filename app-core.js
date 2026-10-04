@@ -57,7 +57,7 @@ window.AppCore = (() => {
     const after = (id, t0 = 1) => state.scene > IDX[id] || (state.scene === IDX[id] && state.t >= t0);
     function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function icon(name, cls) { const s = el("span", cls); s.innerHTML = ICONS[name] || ""; s.setAttribute("aria-hidden", "true"); return s; }
-    function button(cls, text, onClick, extra) { const b = el("button", cls, text); b.type = "button"; b.addEventListener("click", onClick); if (extra) extra(b); return b; }
+    function button(cls, text, onClick) { const b = el("button", cls, text); b.type = "button"; b.addEventListener("click", onClick); return b; }
     const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
     const nextUntried = () => {
       const tried = new Set(state.runs.map(r => r.promptId)); if (state.promptId) tried.add(state.promptId);
@@ -153,7 +153,7 @@ window.AppCore = (() => {
       h.append(el("h3", null, B.name), el("small", null, K.ORG.name + " · " + K.ORG.note)); head.append(el("div", "kmark", B.mark), h);
       const f1 = el("label", "field", "Konto organizacji"), o1 = el("output"); o1.id = "lgUser"; f1.appendChild(o1);
       const f2 = el("label", "field", "Hasło"), o2 = el("output"); o2.id = "lgPass"; f2.appendChild(o2);
-      const go = el("div", "go", "Zaloguj"); go.id = "lgGo"; go.style.textAlign = "center";
+      const go = el("div", "go", "Zaloguj"); go.id = "lgGo";
       const ok = el("div", "badge-ok"); ok.id = "lgOk"; const okText = el("div");
       okText.append(el("b", null, "Zalogowano: " + K.USER.name + " · " + K.USER.dept), el("div", null, "Uprawnienia: " + K.USER.rights));
       ok.append(icon("ok"), okText);
@@ -216,14 +216,14 @@ window.AppCore = (() => {
       if (finalEl.childElementCount) return;
       const card = el("div", "final-card"), h = el("h3", null, B.finalTitle);
       h.appendChild(el("small", null, B.finalSub));
-      const left = el("div"), runs = el("ul", "runs"), hh = el("h4", null, "Twoje przebiegi"); hh.style.marginBottom = "8px";
+      const left = el("div"), runs = el("ul", "runs"), hh = el("h4", null, "Twoje przebiegi");
       left.append(hh, runs);
       if (!state.runs.length) runs.appendChild(el("li", null, "Brak zakończonych przebiegów."));
       state.runs.forEach(r => { const li = el("li"); const [label, result] = H.runLine(c, r); li.append(el("span", null, label), el("em", null, result)); runs.appendChild(li); });
       const ben = el("div", "benefits");
       K.BENEFITS.forEach(b => { const d = el("div", "benefit"); d.append(el("b", null, b.title), el("span", null, b.text)); ben.appendChild(d); });
       const acts = el("div", "final-actions");
-      acts.append(button("btn btn-primary", B.tryAnother, () => startRun(nextUntried()), b => { b.style.flex = "none"; }),
+      acts.append(button("btn btn-primary", B.tryAnother, () => startRun(nextUntried())),
         button("btn btn-ghost", B.adminAction, () => goTo(IDX.admin)),
         button("btn btn-ghost", "Zacznij od nowa", () => restart()));
       const link = el("a", "btn btn-ghost", B.name + " na quanticalab.ai"); link.href = K.SOURCE_URL; link.target = "_blank"; link.rel = "noopener"; acts.appendChild(link);

@@ -13,14 +13,19 @@
 <style>
 /* ─── Product tokens: Klara (accent = Klara orange) ─── */
 :root{
-  --accent:#c2410c;--accent-deep:#9a3412;--accent-tint:#fdf0e8;--accent-mark:#fde2cf;--ring:rgba(194,65,12,.22);
+  --accent:var(--klara-accent);--accent-deep:var(--klara-deep);--accent-tint:var(--klara-tint);--accent-mark:var(--klara-mark);
   --world-accent:#e0560f;--world-accentTint:#fde7d8;
   --world-providerA:#795a9c;--world-providerB:#4f46e5;--world-providerC:#197d78;
-  --world-gaugeLow:#3fb489;--world-gaugeMid:#f0b429;--world-gaugeHigh:#e0560f;--world-blocked:#b4234a;
-  --world-xrayShell:#d6dde2;--world-xrayBg:#0b2533;--world-xrayLine:#7fe3ff;
+  --world-gaugeLow:#3fb489;--world-gaugeMid:#f0b429;--world-gaugeHigh:#e0560f;
+  --world-xrayShell:#d6dde2;
   /* office: cool open space with a Klara-orange lounge */
   --world-officeFloor:#eceff1;--world-rug:#f7ded0;--world-upholstery:#3d5468;--world-sofa:#c95f2e;--world-counter:#f4f6f7;
 }
+/* flow: scanner, gauge and switch in the middle column; the switch fans out to the local model and both external routes */
+.flow{grid-template-columns:repeat(5,1fr)}
+.node[data-node="scan"]{grid-column:3;grid-row:1}.node[data-node="gauge"]{grid-column:3;grid-row:2}.node[data-node="switch"]{grid-column:3;grid-row:3}
+.node[data-node="local"]{grid-column:4;grid-row:2}.node[data-node="apiq"]{grid-column:5;grid-row:1}.node[data-node="frontier"]{grid-column:5;grid-row:3}
+.schema .zone{grid-column:3/5;grid-row:1/4}
 </style>
 </head>
 <body>
@@ -101,7 +106,7 @@
     <div class="probe-out" id="probeOut"></div>
     <div class="dlg-actions">
       <button class="btn" id="btnProbe" type="button">Diagnostyka demo</button>
-      <button class="btn btn-primary" id="btnHelpClose" type="button" style="flex:none">Zamknij</button>
+      <button class="btn btn-primary" id="btnHelpClose" type="button">Zamknij</button>
     </div>
   </dialog>
 </div>

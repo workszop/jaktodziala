@@ -1,7 +1,7 @@
 /* Zagłoba od środka – data: scenes, sources, knowledge base, questions and the pure retrieval decision.
    Classic script: attaches window.ZaglobaData (also loadable in Node via vm for tests).
-   Product statements follow https://quanticalab.ai/zagloba_website.html; documents, fragments, people and the
-   company (Falkarton Sp. z o.o.) are fictional fixtures. */
+   Product statements follow https://quanticalab.ai/zagloba_website.html; documents, people and the company
+   (Falkarton Sp. z o.o.) are fictional fixtures. */
 (function (root) {
   "use strict";
 
@@ -19,22 +19,14 @@
 
   // Knowledge base: access "all" or "board" (folder Zarządu – only with granted access).
   const DOCS = {
-    reklamacje: { title: "Procedura reklamacji dostaw.pdf", source: "sharepoint", access: "all", updated: "2026-05-12",
-      fragment: "Reklamację klienta hurtowego rejestruje się w systemie zamówień w ciągu 2 dni roboczych od zgłoszenia." },
-    obieg: { title: "Instrukcja obiegu dokumentów.docx", source: "sharepoint", access: "all", updated: "2026-03-02",
-      fragment: "Dokumenty reklamacyjne trafiają do działu jakości, który odpowiada w terminie 14 dni." },
-    cennik: { title: "Cennik kartonów klapowych 2026.xlsx", source: "onedrive", access: "all", updated: "2026-01-15",
-      fragment: "Cennik obowiązuje do 31 grudnia 2026 r." },
-    notatka: { title: "Notatka ze spotkania projektowego.docx", source: "onedrive", access: "all", updated: "2026-09-18",
-      fragment: "Start pilotażu nowej linii produkcyjnej zaplanowano na II kwartał 2027 r." },
-    harmonogram: { title: "Harmonogram wdrożenia linii.xlsx", source: "onedrive", access: "all", updated: "2026-09-25",
-      fragment: "Odpowiedzialny: zespół wdrożeniowy; kamienie milowe co 6 tygodni." },
-    budzet: { title: "Budżet inwestycji – Zarząd.xlsx", source: "sharepoint", access: "board", updated: "2026-09-20",
-      fragment: "Zatwierdzony budżet inwestycji: 4,2 mln zł, rezerwa 10%." },
-    delegacje: { title: "Regulamin delegacji 2026.pdf", source: "s3", access: "all", updated: "2026-01-02",
-      fragment: "Obowiązujące zasady rozliczania delegacji zagranicznych opisuje § 7 regulaminu." },
-    zdalna: { title: "Regulamin pracy zdalnej.docx", source: "sharepoint", access: "all", updated: "2026-10-01", fresh: true,
-      fragment: "Od 1 października 2026 r. limit pracy zdalnej wynosi 2 dni w tygodniu; wniosek składa się przez system kadrowy." }
+    reklamacje: { title: "Procedura reklamacji dostaw.pdf", source: "sharepoint", access: "all" },
+    obieg: { title: "Instrukcja obiegu dokumentów.docx", source: "sharepoint", access: "all" },
+    cennik: { title: "Cennik kartonów klapowych 2026.xlsx", source: "onedrive", access: "all" },
+    notatka: { title: "Notatka ze spotkania projektowego.docx", source: "onedrive", access: "all" },
+    harmonogram: { title: "Harmonogram wdrożenia linii.xlsx", source: "onedrive", access: "all" },
+    budzet: { title: "Budżet inwestycji – Zarząd.xlsx", source: "sharepoint", access: "board" },
+    delegacje: { title: "Regulamin delegacji 2026.pdf", source: "s3", access: "all" },
+    zdalna: { title: "Regulamin pracy zdalnej.docx", source: "sharepoint", access: "all", fresh: true }
   };
 
   // Questions with retrieval candidates (semantic + keyword scores 0..1). `covered` = the base answers the question.

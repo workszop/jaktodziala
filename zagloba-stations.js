@@ -35,8 +35,7 @@ window.ZaglobaStations = {
       { id: "s3", text: "Amazon S3", color: "srcC", pos: [13.5, 3.95, -2.7], scenes: ["send", "admin", "final"] }
     ],
     anchors: {
-      monitor: [8.6, 1.74, 1.94], index: [8.75, 0.9, 2.05], search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], skipped: [9.95, 0.42, 3.45],
-      podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], connectors: [10.75, 1.99, 1.8], sharepoint: [9.0, 3.5, -2.7]
+      search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], sharepoint: [9.0, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server z bazą wiedzy i źródła danych organizacji. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
   },
@@ -46,7 +45,7 @@ window.ZaglobaStations = {
     // ─── Constants ───
     const { THREE, G, colors, refs, paths, info, options } = k;
     const { box, cylinder, sphere, group, strip, own, canvasTexture, makePath, reverseSegments, fakeText, seeded, paintMark } = k;
-    const { clamp, phase, ease, easeOutBack, lerp, order } = k;
+    const { clamp, phase, ease, lerp, v3, order } = k;
     const { FLOOR, RIDE } = G;
     const Z = window.ZaglobaData;
     const SEARCH = [9.2, RIDE, 2.8], ACCESS = [10.05, RIDE, 2.8], RANK = [10.9, RIDE, 2.8], INLET = G.INLET;
@@ -54,7 +53,7 @@ window.ZaglobaStations = {
     const STAGE_Z = 2.42, CARD = { w: 0.15, h: 0.2 };
     const TRAY = [9.95, 0.32, 3.45];
     const PODIUM = [{ x: 10.9, h: 0.3 }, { x: 10.6, h: 0.22 }, { x: 11.2, h: 0.15 }], PODIUM_Z = 2.3;
-    const SRC_TONE = { sharepoint: "srcA", onedrive: "srcB", s3: "srcC" };
+    const SRC_TONE = Object.fromEntries(Z.SOURCE_IDS.map(sid => [sid, Z.SOURCES[sid].tone]));
     const CLOUD = { sharepoint: [9.0, 3.1, -2.7], onedrive: [11.25, 3.45, -3.1], s3: [13.5, 3.1, -2.7] };
     const DOC_IDS = Object.keys(Z.DOCS);
     Object.assign(info, { candidates: 0, skippedShown: 0, podium: 0, keywords: 0, monitorView: "idle", blade: 0 });
@@ -236,33 +235,31 @@ window.ZaglobaStations = {
     }
 
     // ─── Pose ───
-    const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    function cardPlan(s, d, o, sheetX) {
+    function cardPlan(s, d, sheetX) {
       // Where every candidate card is in this scene and moment; non-candidates stay in their shelf slots.
       const id = s.sceneId, t = s.t, plan = {}, cand = d ? d.candidates : [], n = cand.length;
-      const stage = (i, x) => V(x + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z);
-      const slot = cid => V(...refs.slots[cid]);
+      const stage = (i, x) => v3([x + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]);
+      const slot = cid => v3(refs.slots[cid]);
       const rankIdx = cid => (d ? d.ranked.indexOf(cid) : -1);
-      const podiumPos = r => V(PODIUM[r].x, FLOOR + 0.12 + PODIUM[r].h + CARD.h / 2 + 0.01, PODIUM_Z);
+      const podiumPos = r => v3([PODIUM[r].x, FLOOR + 0.12 + PODIUM[r].h + CARD.h / 2 + 0.01, PODIUM_Z]);
       cand.forEach((cid, i) => {
         const skipped = d.skipped.includes(cid), r = rankIdx(cid);
         let pos = slot(cid), vis = true, scale = 1, red = 0, lock = false;
         if (id === "search") { const u = ease(phase(t, 0.55 + i * 0.07, 0.75 + i * 0.07)); pos = slot(cid).lerp(stage(i, sheetX), u); }
         else if (id === "access") {
           const tc = 0.32 + i * 0.13;
-          if (skipped) { const stop = V(9.8, 0.66, STAGE_Z); pos = stage(i, sheetX < 9.8 ? sheetX : 9.8); if (t > tc) pos = stop.clone(); red = t > tc ? 1 : 0; lock = t > tc + 0.05; if (t > tc + 0.12) pos = stop.lerp(V(...TRAY).add(V(0, 0.12, 0)), ease(phase(t, tc + 0.12, tc + 0.3))); }
-          else pos = stage(i, Math.min(sheetX, 9.85)).lerp(V(10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z), ease(phase(t, tc, tc + 0.1)));
+          if (skipped) { const stop = v3([9.8, 0.66, STAGE_Z]); pos = stage(i, sheetX < 9.8 ? sheetX : 9.8); if (t > tc) pos = stop.clone(); red = t > tc ? 1 : 0; lock = t > tc + 0.05; if (t > tc + 0.12) pos = stop.lerp(v3(TRAY).add(v3([0, 0.12, 0])), ease(phase(t, tc + 0.12, tc + 0.3))); }
+          else pos = stage(i, Math.min(sheetX, 9.85)).lerp(v3([10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]), ease(phase(t, tc, tc + 0.1)));
         }
         else if (id === "rank") {
-          if (skipped) { pos = V(...TRAY).add(V((i - 1) * 0.05, 0.12, 0)); red = 1; lock = true; }
-          else { const from = V(10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z), u = ease(phase(t, 0.3 + i * 0.06, 0.55 + i * 0.06)); pos = r >= 0 ? from.lerp(podiumPos(r), u) : from; if (r < 0) scale = 1 - 0.97 * u; }
+          if (skipped) { pos = v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); red = 1; lock = true; }
+          else { const from = v3([10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]), u = ease(phase(t, 0.3 + i * 0.06, 0.55 + i * 0.06)); pos = r >= 0 ? from.lerp(podiumPos(r), u) : from; if (r < 0) scale = 1 - 0.97 * u; }
         }
         else if (id === "model") {
-          if (skipped) { pos = V(...TRAY).add(V((i - 1) * 0.05, 0.12, 0)); red = 1; lock = true; }
-          else if (r >= 0) { const u = ease(phase(t, 0.05 + r * 0.04, 0.38)); pos = podiumPos(r).lerp(V(...GPU_IN), u); scale = 1 - 0.97 * ease(phase(t, 0.28, 0.4)); }
+          if (skipped) { pos = v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); red = 1; lock = true; }
+          else if (r >= 0) { const u = ease(phase(t, 0.05 + r * 0.04, 0.38)); pos = podiumPos(r).lerp(v3(GPU_IN), u); scale = 1 - 0.97 * ease(phase(t, 0.28, 0.4)); }
           else vis = false;
         }
-        else if (o > order("model") || o < order("search")) { pos = slot(cid); }
         plan[cid] = { pos, vis: vis && scale > 0.04, scale, red, lock };
       });
       return plan;
@@ -291,23 +288,23 @@ window.ZaglobaStations = {
       refs.beams.forEach((b, i) => {
         const cid = cand[i], show = searching && cid && t > 0.45 && t < 0.62 + i * 0.07;
         b.visible = !!show; if (!show) return;
-        const a = V(SEARCH[0], RIDE + 0.1, SEARCH[2]), z = V(...refs.slots[cid]), mid = a.clone().add(z).multiplyScalar(0.5), len = a.distanceTo(z);
-        b.position.copy(mid); b.scale.set(1, len, 1); b.quaternion.setFromUnitVectors(V(0, 1, 0), z.clone().sub(a).normalize());
+        const a = v3([SEARCH[0], RIDE + 0.1, SEARCH[2]]), z = v3(refs.slots[cid]), mid = a.clone().add(z).multiplyScalar(0.5), len = a.distanceTo(z);
+        b.position.copy(mid); b.scale.set(1, len, 1); b.quaternion.setFromUnitVectors(v3([0, 1, 0]), z.clone().sub(a).normalize());
       });
       // fresh document arrives through the SharePoint pipe at the start of the search
       const freshId = d && d.fresh.length ? d.fresh[0] : null;
       // cards
-      const sheetX = pos ? pos.x : SEARCH[0], plan = d ? cardPlan(s, d, o, sheetX) : {};
+      const sheetX = pos ? pos.x : SEARCH[0], plan = d ? cardPlan(s, d, sheetX) : {};
       let shownCandidates = 0, inTray = 0, onPodium = 0;
       for (const cid of DOC_IDS) {
         const card = refs.cards[cid], pl = plan[cid];
-        let cpos = V(...refs.slots[cid]), vis = true, sc = 1, red = 0, lock = false;
+        let cpos = v3(refs.slots[cid]), vis = true, sc = 1, red = 0, lock = false;
         if (pl) ({ pos: cpos, vis, scale: sc, red, lock } = pl);
         // the changed document only reaches the index through the sync pipe during this search
         if (cid === freshId && o < order("search")) vis = false;
         else if (cid === freshId && id === "search" && t < 0.3) {
           const pipe = refs.pipes.sharepoint;
-          cpos = t < 0.22 ? pipe.getPointAt(clamp(ease(phase(t, 0, 0.22)))) : pipe.getPointAt(1).lerp(V(...refs.slots[cid]), ease(phase(t, 0.22, 0.3)));
+          cpos = t < 0.22 ? pipe.getPointAt(clamp(ease(phase(t, 0, 0.22)))) : pipe.getPointAt(1).lerp(v3(refs.slots[cid]), ease(phase(t, 0.22, 0.3)));
           sc = t < 0.22 ? 2.2 : lerp(2.2, 1, ease(phase(t, 0.22, 0.3)));
         }
         card.g.position.copy(cpos); card.g.visible = vis; card.g.scale.setScalar(sc); card.g.rotation.set(-0.25, 0.25, 0);

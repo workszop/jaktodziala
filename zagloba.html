@@ -13,10 +13,10 @@
 <style>
 /* ─── Product tokens: Zagłoba (accent = Zagłoba sea green) ─── */
 :root{
-  --accent:#197d78;--accent-deep:#0f5a56;--accent-tint:#e8f5f2;--accent-mark:#c9ebe3;--ring:rgba(25,125,120,.22);
+  --accent:var(--zagloba-accent);--accent-deep:var(--zagloba-deep);--accent-tint:var(--zagloba-tint);--accent-mark:var(--zagloba-mark);
   --world-accent:#1f9a92;--world-accentTint:#d9f2ee;
   --world-srcA:#3b6fb6;--world-srcB:#5b8def;--world-srcC:#d08a2a;--world-lockRed:#d1334f;
-  --world-xrayBg:#0b2533;--world-xrayLine:#7fe3ff;--world-podium:#e8eef2;--world-tube:#bfe3ee;
+  --world-podium:#e8eef2;--world-tube:#bfe3ee;
   /* knowledge-base shelves inside the server keep the light server wood, apart from the office oak */
   --world-shelf:#b89267;
   /* office: warm knowledge office – oak floor, sage walls, sea-green rug and chairs */
@@ -25,7 +25,6 @@
 /* flow: sources feed the search; the journey snakes back to the answer */
 .flow{grid-template-columns:repeat(4,1fr)}
 .node[data-node="sources"]{grid-column:3;grid-row:1}
-.node[data-node="desk"]{grid-column:1;grid-row:2}.node[data-node="cable"]{grid-column:2;grid-row:2}
 .node[data-node="search"]{grid-column:3;grid-row:2}.node[data-node="access"]{grid-column:4;grid-row:2}
 .node[data-node="rank"]{grid-column:4;grid-row:3}.node[data-node="local"]{grid-column:3;grid-row:3}.node[data-node="answer"]{grid-column:2;grid-row:3}
 .schema .zone{grid-column:3/5;grid-row:2/4}
@@ -108,7 +107,7 @@
     <div class="probe-out" id="probeOut"></div>
     <div class="dlg-actions">
       <button class="btn" id="btnProbe" type="button">Diagnostyka demo</button>
-      <button class="btn btn-primary" id="btnHelpClose" type="button" style="flex:none">Zamknij</button>
+      <button class="btn btn-primary" id="btnHelpClose" type="button">Zamknij</button>
     </div>
   </dialog>
 </div>

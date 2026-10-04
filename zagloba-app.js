@@ -15,6 +15,7 @@
   };
   const docTitle = id => Z.DOCS[id].title;
   const srcTitle = id => Z.SOURCES[Z.DOCS[id].source].title;
+  const USER_LINE = Z.USER.name + " · " + Z.USER.dept;
 
   // ─── Hooks ───
   const hooks = {
@@ -28,7 +29,7 @@
         if (t > 0.45) out.push({ id: "search", anchor: "search", side: "right", tone: "accent", kicker: "Krok 1 · Wyszukiwanie hybrydowe", title: t > 0.75 ? "Znaleziono " + d.candidates.length + " dokumenty" : "Przeszukiwanie bazy wiedzy…",
           lines: [{ text: "semantyczne: znaczenie pytania", state: "on" }, { text: "słowa kluczowe: wyróżnione na kartce", state: "on" }, ...(t > 0.75 ? d.candidates.map(cid => ({ text: docTitle(cid), state: "muted" })) : [])] });
       }
-      if (id === "access" && t > 0.3) out.push({ id: "gate", anchor: "gate", side: "right", tone: "admin", kicker: "Krok 2 · Kontrola uprawnień", title: K_USER_LINE,
+      if (id === "access" && t > 0.3) out.push({ id: "gate", anchor: "gate", side: "right", tone: "admin", kicker: "Krok 2 · Kontrola uprawnień", title: USER_LINE,
         lines: d.candidates.filter((_, i) => t > 0.32 + i * 0.13).map(cid => d.skipped.includes(cid) ? { text: docTitle(cid) + " – BRAK DOSTĘPU, pominięty", state: "flag" } : { text: docTitle(cid) + " – dostęp", state: "ok" }) });
       if (id === "rank" && t > 0.35) out.push({ id: "podium", anchor: "podium", side: "right", tone: "accent", kicker: "Krok 3 · Ocena trafności",
         title: d.ranked.length ? "Do odpowiedzi: " + d.ranked.length + " najtrafniejsze" : "Brak trafnych dokumentów",
@@ -89,7 +90,7 @@
     },
 
     renderInspector(c) {
-      const { el, icon, $, after } = c, p = c.prompt(), d = c.decision();
+      const { el, icon, $, after, setText } = c, p = c.prompt(), d = c.decision();
       const iText = $("iText"), iDocs = $("iDocs"), iChecks = $("iChecks"), iMeta = $("iMeta");
       if (iText.dataset.prompt !== p.id) { iText.textContent = p.text; iText.dataset.prompt = p.id; }
       const found = after("search", 0.75), access = after("access", 0.6), rank = after("rank", 0.6);
@@ -110,9 +111,9 @@
       [...iChecks.children].forEach((li, n) => {
         const stt = !done[n] ? "pending" : (n === 1 && d.skipped.length) || (n === 2 && d.outcome === "nodata") ? "flag" : "ok";
         if (li.dataset.state !== stt) { li.dataset.state = stt; li.firstChild.innerHTML = stt === "pending" ? "" : stt === "flag" ? c.ICONS.lock.replace('width="14" height="14"', 'width="10" height="10"') : c.ICONS.check; }
-        setTxt(li.lastChild, done[n] ? d.checks[n] : pending[n] + " …");
+        setText(li.lastChild, done[n] ? d.checks[n] : pending[n] + " …");
       });
-      setTxt(iMeta, after("model", 0.5) ? d.badge : "");
+      setText(iMeta, after("model", 0.5) ? d.badge : "");
     },
 
     // Chat: answers carry citation cards; "no data" answers name the right source.
@@ -140,7 +141,7 @@
       const srcCard = el("div", "card"), list = el("ul", "log");
       srcCard.append(el("h4", null, "Źródła danych · synchronizacja w tle"), list);
       Z.SOURCE_IDS.forEach(sid => { const li = el("li"), n = Object.values(Z.DOCS).filter(doc => doc.source === sid).length; li.append(el("span", null, Z.SOURCES[sid].title + " · " + n + " dokumenty (demo)"), el("em", null, sid === "sharepoint" ? "zmiana wykryta wczoraj" : "aktualne")); list.appendChild(li); });
-      srcCard.style.marginTop = "12px"; left.append(el("h4", null, "Wykorzystanie (ta sesja demo)"), tiles, srcCard);
+      left.append(el("h4", null, "Wykorzystanie (ta sesja demo)"), tiles, srcCard);
       const right = el("div", "card"), rule = el("div", "rule"), rt = el("div");
       rt.append(el("b", null, "Role i poziomy dostępu są zachowane"), el("div", null, "Odpowiedzi powstają wyłącznie z dokumentów, do których użytkownik ma uprawnienia."));
       rule.append(icon("lock"), rt);
@@ -186,8 +187,6 @@
       c.state.runs.forEach(r => { for (const cid of r.citations) if (!Z.canRead(Z.DOCS[cid], r.settings)) results.push("run-permission:" + r.promptId + "/" + cid); });
     }
   };
-  const K_USER_LINE = Z.USER.name + " · " + Z.USER.dept;
-  function setTxt(node, text) { if (node.textContent !== text) node.textContent = text; }
 
   // ─── Init ───
   window.ZaglobaWorld = window.WorldCore.create(window.ZaglobaStations);

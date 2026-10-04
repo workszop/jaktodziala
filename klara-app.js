@@ -180,7 +180,7 @@
       logCard.append(el("h4", null, "Ostatnie zapytania (ta sesja demo)"), log);
       if (!runs.length) log.appendChild(el("li", null, "Brak zapytań – wyślij polecenie z okna czatu."));
       runs.slice().reverse().forEach(r => { const li = el("li"); li.append(el("span", null, K.promptById(r.promptId).label), el("em", null, K.ROUTES[r.target].title)); log.appendChild(li); });
-      logCard.style.marginTop = "12px"; left.append(el("h4", null, "Wykorzystanie modeli"), tiles, logCard);
+      left.append(el("h4", null, "Wykorzystanie modeli"), tiles, logCard);
       const right = el("div", "card"), rule = el("div", "rule"), rt = el("div");
       rt.append(el("b", null, "Dane chronione → tylko model lokalny"), el("div", null, "Reguła stała: dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."));
       rule.append(icon("lock"), rt);
@@ -206,7 +206,7 @@
       if (p && ds.route !== d.target) failures.push("route-contract");
       if (p && items(p).length && ds.route !== "local") failures.push("privacy-route");
       if (p && items(p).length) $("iRoutes").querySelectorAll('[data-route="apiq"],[data-route="frontier"]').forEach(r => { if (r.dataset.state === "on") failures.push("privacy-card"); });
-      if (p && after("route", 0.7) && IDX[ds.scene] <= IDX.final) {
+      if (p && after("route", 0.7)) {
         const chosen = [...flowEl.querySelectorAll('[data-state="chosen"],[data-state="active"]')].map(n => n.dataset.node).filter(n => K.ROUTE_IDS.includes(n));
         if (chosen.length !== 1 || chosen[0] !== d.target) failures.push("flow-target");
       }

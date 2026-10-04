@@ -35,6 +35,7 @@ window.WorldCore = (() => {
   const SHEET = { w: 0.26, h: 0.34, tex: [512, 668], tilt: -0.6, facing: 0.25, scale: 1.15 };
   const PDF = { w: 0.17, h: 0.22, tex: [256, 332], max: 2 };
   const MSG_MARK_ROWS = [1, 3, 5], PDF_MARK_ROWS = [0, 1, 2, 3];
+  const LIGHT_LIFT = [0, 0.3, 0.15]; // the carrier's glow light hovers above and in front of the sheet
 
   function create(product) {
     const P = product.config;
@@ -47,7 +48,7 @@ window.WorldCore = (() => {
     const colors = {}, materials = {}, geometries = new Map(), refs = {}, paths = {};
     const view = { target: null, span: 8.4, angle: 0.62, elev: 0.6 };
     const user = { yaw: 0, zoom: 1, drag: null };
-    let labelItems = [], lastSig = "", settled = false, coSvg = null;
+    let labelItems = [], lastSig = "", settled = false, coSvg = null, scratch = null;
     const callouts = new Map();
     const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0 };
 
@@ -189,7 +190,8 @@ window.WorldCore = (() => {
 
     // ─── Build: office ───
     // A desk with a monitor; the user sits on the +z side (rot turns it around its centre).
-    function deskAt(x, z, screenMat = refs.deskScreenMat || (refs.deskScreenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 })), rot = 0) {
+    function deskAt(x, z, screenMat, rot = 0) {
+      screenMat = screenMat || (refs.deskScreenMat ??= own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }));
       const g = group(x, 0, z); g.rotation.y = rot;
       box(0, 0, 1.3, 0.66, 0.05, "wood", 0.7, g, 0.03);
       for (const dx of [-0.6, 0.6]) for (const dz of [-0.28, 0.28]) box(dx, dz, 0.05, 0.05, 0.7, "metal", 0, g);
@@ -305,7 +307,7 @@ window.WorldCore = (() => {
           c.fillStyle = colors.paper; c.font = "700 64px " + (options.font || "sans-serif"); c.fillText(n, 68, h / 2 + 23);
           c.font = "700 " + (title.length > 13 ? 40 : 46) + "px " + (options.font || "sans-serif"); c.fillText(title, 160, h / 2 + 16, w - 170);
         });
-        const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.27), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
+        const plate = new THREE.Mesh(geo("plane", [0.72, 0.27], () => new THREE.PlaneGeometry(0.72, 0.27)), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }));
         plate.rotation.x = -Math.PI / 2; plate.position.set(x, G.FLOOR + 0.125, 3.52); plate.receiveShadow = true; world.add(plate);
       }
     }
@@ -321,7 +323,7 @@ window.WorldCore = (() => {
         const led = own("gpuLed", { emissive: colors.gpuLed, emissiveIntensity: 0.15 });
         box(0, 0.302, 0.62, 0.01, 0.025, led, 0.02, g);
         const tex = canvasTexture(512, 64, (c, w) => { c.fillStyle = colors.gpu; c.fillRect(0, 0, w, 64); c.fillStyle = colors.rackLine; c.font = "700 34px " + (options.font || "sans-serif"); c.textAlign = "center"; c.fillText(label + " " + (i + 1), w / 2, 44); });
-        const lab = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.075), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); lab.position.set(0, 0.11, 0.304); g.add(lab);
+        const lab = new THREE.Mesh(geo("plane", [0.6, 0.075], () => new THREE.PlaneGeometry(0.6, 0.075)), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 })); lab.position.set(0, 0.11, 0.304); g.add(lab);
         // the chosen server swallows the sheet, so it is exempt from the collision check
         if (i === chosen) g.traverse(o => { o.userData.noCollide = true; });
         return { g, led, z };
@@ -344,7 +346,7 @@ window.WorldCore = (() => {
           for (let i = 0; i < 3; i++) { const d = box(-0.08 + i * 0.08, 0.05 - i * 0.02, 0.16, 0.2, 0.02, i === 2 ? c.ring : "paper", 0.46 + i * 0.022, g, 0.01); d.rotation.y = (i - 1) * 0.15; }
         } else (c.cubes || []).forEach((col, i) => box(-0.14 + i * 0.14, 0.05, 0.1, 0.1, 0.1, col, 0.46, g, 0.02));
         refs.cloudMats[c.key] = own(c.ring, { emissive: colors[c.ring], emissiveIntensity: 0, transparent: true, opacity: 0.8 });
-        const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 40), refs.cloudMats[c.key]); ring.rotation.x = -Math.PI / 2; ring.position.y = -0.2; g.add(ring);
+        const ring = new THREE.Mesh(geo("ring", [0.62, 0.7, 40], () => new THREE.RingGeometry(0.62, 0.7, 40)), refs.cloudMats[c.key]); ring.rotation.x = -Math.PI / 2; ring.position.y = -0.2; g.add(ring);
         refs.clouds[c.key] = g;
       }
     }
@@ -428,6 +430,7 @@ window.WorldCore = (() => {
       }
       const answerEdge = own("ok", { emissive: colors.ok, emissiveIntensity: 0.9 });
       refs.answer = buildSheet("ok", answerEdge, 11, 6).g;
+      refs.allMarks = [...refs.msgMarks, ...refs.pdfs.flatMap(pdf => pdf.marks)];
       refs.light = new THREE.PointLight(colors.accent, 0, 1.6, 1.6); world.add(refs.light);
       refs.packet.visible = refs.answer.visible = false;
     }
@@ -486,8 +489,8 @@ window.WorldCore = (() => {
         carrier.visible = true; carrier.position.copy(out.pos);
         carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.04; carrier.scale.setScalar(SHEET.scale * (out.scale ?? 1));
       }
-      refs.light.intensity = carrier ? 1.0 : 0; if (carrier && out.pos) refs.light.position.copy(out.pos).add(new THREE.Vector3(0, 0.3, 0.15));
-      info.redactions = [...refs.msgMarks, ...refs.pdfs.flatMap(pdf => pdf.marks)].filter(mk => mk.bar.visible).length;
+      refs.light.intensity = carrier ? 1.0 : 0; if (carrier && out.pos) refs.light.position.set(out.pos.x + LIGHT_LIFT[0], out.pos.y + LIGHT_LIFT[1], out.pos.z + LIGHT_LIFT[2]);
+      info.redactions = refs.allMarks.reduce((n, mk) => n + (mk.bar.visible ? 1 : 0), 0);
       return { packetPos: out.pos, carrier };
     }
 
@@ -508,11 +511,11 @@ window.WorldCore = (() => {
       const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
       const tgt = shot.target;
       if (!view.target) view.target = v3(SHOTS.over.target);
-      const before = view.target.x + view.target.y + view.target.z + view.span + view.angle + view.elev;
-      view.target.x = lerp(view.target.x, tgt[0], k); view.target.y = lerp(view.target.y, tgt[1], k); view.target.z = lerp(view.target.z, tgt[2], k);
-      view.span = lerp(view.span, shot.span, k); view.angle = lerp(view.angle, shot.angle, k); view.elev = lerp(view.elev, shot.elev, k);
-      const after = view.target.x + view.target.y + view.target.z + view.span + view.angle + view.elev;
-      settled = Math.abs(after - before) < 1e-4;
+      // per-component steps: a sum of all six could cancel opposite moves and report a moving camera as settled
+      const dx = (tgt[0] - view.target.x) * k, dy = (tgt[1] - view.target.y) * k, dz = (tgt[2] - view.target.z) * k;
+      const ds = (shot.span - view.span) * k, da = (shot.angle - view.angle) * k, de = (shot.elev - view.elev) * k;
+      view.target.x += dx; view.target.y += dy; view.target.z += dz; view.span += ds; view.angle += da; view.elev += de;
+      settled = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz), Math.abs(ds), Math.abs(da), Math.abs(de)) < 1e-4;
       const a = view.angle + user.yaw, e = view.elev, aspect = width / height, span = view.span / user.zoom;
       camera.position.set(view.target.x + Math.sin(a) * Math.cos(e) * 30, view.target.y + Math.sin(e) * 30, view.target.z + Math.cos(a) * Math.cos(e) * 30);
       camera.lookAt(view.target);
@@ -521,7 +524,7 @@ window.WorldCore = (() => {
       info.camera = shot === SHOTS.monitor ? "monitor" : shot === SHOTS.admin ? "admin" : shot === SHOTS.over ? "over" : "scene";
     }
     function updateLabels(s) {
-      const v = new THREE.Vector3();
+      const v = scratch;
       for (const item of labelItems) {
         const l = item.def;
         let show = l.scenes.includes(s.sceneId) && !(s.callouts || []).some(c => c.anchor === l.id);
@@ -539,20 +542,21 @@ window.WorldCore = (() => {
     }
     // Explanation cards anchored to 3D points; content (kicker, title, lines) comes from the app.
     function updateCallouts(s) {
-      const list = Array.isArray(s.callouts) ? s.callouts : [], seen = new Set(), v = new THREE.Vector3();
+      const list = Array.isArray(s.callouts) ? s.callouts : [], seen = new Set(), v = scratch;
       for (const c of list) {
-        if (!ANCHORS[c.anchor]) continue;
+        const anchor = ANCHORS[c.anchor];
+        if (!anchor) continue;
         seen.add(c.id);
         let item = callouts.get(c.id);
         if (!item) {
           const el = document.createElement("div"); el.className = "co"; el.dataset.callout = c.id;
           const line = document.createElementNS("http://www.w3.org/2000/svg", "line"), dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
           dot.setAttribute("r", "4"); coSvg.append(line, dot); labelsEl.appendChild(el);
-          item = { el, line, dot, sig: "" }; callouts.set(c.id, item);
+          item = { el, line, dot, sig: "", key: "", shown: true }; callouts.set(c.id, item);
         }
         const sig = JSON.stringify(c);
         if (sig !== item.sig) {
-          item.sig = sig; const el = item.el; el.replaceChildren(); el.dataset.tone = c.tone || "accent";
+          item.sig = sig; item.key = ""; const el = item.el; el.replaceChildren(); el.dataset.tone = c.tone || "accent";
           for (const node of [item.line, item.dot]) node.dataset.tone = c.tone || "accent";
           if (c.kicker) { const k = document.createElement("span"); k.className = "co-k"; k.textContent = c.kicker; el.appendChild(k); }
           const b = document.createElement("b"); b.textContent = c.title; el.appendChild(b);
@@ -561,20 +565,24 @@ window.WorldCore = (() => {
             for (const ln of c.lines) { const li = document.createElement("li"); li.dataset.state = ln.state || "muted"; li.textContent = ln.text; ul.appendChild(li); }
             el.appendChild(ul);
           }
-          item.w = el.offsetWidth; item.h = el.offsetHeight;
+          // a hidden card ([hidden] is display:none) measures 0 × 0: show it before measuring
+          el.hidden = false; item.w = el.offsetWidth; item.h = el.offsetHeight;
         }
-        v.set(...ANCHORS[c.anchor]).project(camera);
+        v.set(anchor[0], anchor[1], anchor[2]).project(camera);
         const ax = (v.x + 1) / 2 * width, ay = (1 - v.y) / 2 * height, gap = 34, w = item.w, h = item.h, side = c.side || "right";
         let x = side === "left" ? ax - gap - w : side === "right" ? ax + gap : ax - w / 2;
         let y = side === "top" ? ay - gap - h : side === "bottom" ? ay + gap : ay - h / 2;
         x = clamp(x, 8, Math.max(8, width - w - 8)); y = clamp(y, 8, Math.max(8, height - h - 8));
-        item.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`; item.el.hidden = false;
+        if (!item.shown) { item.el.hidden = false; item.line.style.display = item.dot.style.display = ""; item.shown = true; }
+        // skip the DOM writes while the card and its leader line stay put
+        const rx = Math.round(x), ry = Math.round(y), sax = ax.toFixed(1), say = ay.toFixed(1), key = rx + "," + ry + "," + sax + "," + say;
+        if (key === item.key) continue;
+        item.key = key; item.el.style.transform = `translate(${rx}px, ${ry}px)`;
         const ex = clamp(ax, x, x + w), ey = clamp(ay, y, y + h);
-        item.line.setAttribute("x1", ax.toFixed(1)); item.line.setAttribute("y1", ay.toFixed(1)); item.line.setAttribute("x2", ex.toFixed(1)); item.line.setAttribute("y2", ey.toFixed(1));
-        item.dot.setAttribute("cx", ax.toFixed(1)); item.dot.setAttribute("cy", ay.toFixed(1));
-        item.line.style.display = item.dot.style.display = "";
+        item.line.setAttribute("x1", sax); item.line.setAttribute("y1", say); item.line.setAttribute("x2", ex.toFixed(1)); item.line.setAttribute("y2", ey.toFixed(1));
+        item.dot.setAttribute("cx", sax); item.dot.setAttribute("cy", say);
       }
-      for (const [cid, item] of callouts) if (!seen.has(cid)) { item.el.hidden = true; item.line.style.display = item.dot.style.display = "none"; }
+      for (const [cid, item] of callouts) if (!seen.has(cid) && item.shown) { item.el.hidden = true; item.line.style.display = item.dot.style.display = "none"; item.shown = false; }
       info.callouts = seen.size;
     }
 
@@ -591,79 +599,6 @@ window.WorldCore = (() => {
       updateCamera(desiredShot(s, p), dt, s.reduced);
       updateLabels(s); updateCallouts(s);
       renderer.render(scene, camera); info.renders++;
-    }
-
-    // ─── Listeners ───
-    function bindInput(canvas) {
-      canvas.addEventListener("contextmenu", e => e.preventDefault());
-      canvas.addEventListener("pointerdown", e => { user.drag = { x: e.clientX, yaw: user.yaw }; canvas.setPointerCapture(e.pointerId); });
-      canvas.addEventListener("pointermove", e => { if (user.drag) { user.yaw = clamp(user.drag.yaw - (e.clientX - user.drag.x) * 0.006, -1.2, 1.2); lastSig = ""; } });
-      const end = () => { user.drag = null; };
-      canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
-      canvas.addEventListener("wheel", e => { e.preventDefault(); user.zoom = clamp(user.zoom * (e.deltaY < 0 ? 1.1 : 0.91), 0.6, 2.2); lastSig = ""; }, { passive: false });
-      canvas.addEventListener("dblclick", () => resetView());
-      canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); fail("Utracono grafikę 3D. Aktywny widok schematu."); });
-    }
-    function resetView() { user.yaw = 0; user.zoom = 1; lastSig = ""; }
-    function resize() {
-      const r = stage.getBoundingClientRect(); width = Math.max(1, r.width); height = Math.max(1, r.height);
-      renderer.setSize(width, height, false); lastSig = "";
-    }
-
-    // ─── Init ───
-    async function init(config) {
-      options = config; stage = config.stage; labelsEl = config.labels; info.renderer = "loading";
-      try {
-        let timer;
-        try { THREE = await Promise.race([import(THREE_URL), new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("3D library timeout")), 10000); })]); }
-        finally { clearTimeout(timer); }
-        const css = getComputedStyle(document.documentElement);
-        for (const k of COLOR_KEYS) colors[k] = css.getPropertyValue("--world-" + k).trim() || css.getPropertyValue("--world-paper").trim();
-        options.font = css.getPropertyValue("--font-ui").trim();
-        if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
-        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-        renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
-        renderer.domElement.className = "world-canvas"; renderer.domElement.setAttribute("role", "img");
-        renderer.domElement.setAttribute("aria-label", P.ariaLabel || "Świat 3D. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok.");
-        stage.prepend(renderer.domElement);
-        scene = new THREE.Scene(); scene.background = new THREE.Color(colors.background);
-        camera = new THREE.OrthographicCamera(-5, 5, 4, -4, 0.1, 90);
-        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 2.0));
-        sun = new THREE.DirectionalLight(colors.light, 3.0); sun.position.set(3, 14, 9); sun.target.position.set(7, 0, 2);
-        sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-        Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 9, bottom: -9, far: 40 }); sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0002;
-        scene.add(sun, sun.target);
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: colors.background, roughness: 1 }));
-        ground.rotation.x = -Math.PI / 2; ground.position.y = -0.25; ground.receiveShadow = true; scene.add(ground);
-        world = new THREE.Group(); scene.add(world);
-        S = product.create({
-          THREE, G, SHEET, colors, refs, paths, info, options, world,
-          clamp, phase, ease, easeOutBack, lerp, v3, order, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture, hexPath, drawQ,
-          makePath, reverseSegments, seeded, pill, fakeText, paintMark, belt, plates, serverCabinet, rackMonitor, deskAt, chair, plant
-        });
-        buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();
-        S.build(); S.buildPaths();
-        buildPacket();
-        refs.employee = buildRobot("brand"); refs.adminBot = buildRobot("admin");
-        refs.adminBot.g.position.set(G.ADMIN.x, G.FLOOR, G.ADMIN.z + 0.62); refs.adminBot.g.rotation.y = Math.PI;
-        buildLabels();
-        resizeObserver = new ResizeObserver(resize); resizeObserver.observe(stage); resize();
-        bindInput(renderer.domElement);
-        info.renderer = "webgl";
-        if (config.onReady) config.onReady();
-      } catch (err) {
-        console.warn("3D unavailable, using the schematic view.", err);
-        fail("Widok uproszczony: grafika 3D niedostępna. Demo działa na schemacie.");
-      }
-    }
-    function fail(message) {
-      info.renderer = "fallback";
-      if (resizeObserver) resizeObserver.disconnect();
-      if (renderer) { renderer.domElement.remove(); renderer.dispose(); }
-      if (labelsEl) labelsEl.replaceChildren();
-      if (options.onFail) options.onFail(message);
     }
 
     // ─── Diagnostics: does the travelling sheet pass through scene geometry? ───
@@ -703,8 +638,83 @@ window.WorldCore = (() => {
       return { ok: list.length === 0, count: list.length, hits: list };
     }
 
+    // ─── Listeners ───
+    function bindInput(canvas) {
+      canvas.addEventListener("contextmenu", e => e.preventDefault());
+      canvas.addEventListener("pointerdown", e => { user.drag = { x: e.clientX, yaw: user.yaw }; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener("pointermove", e => { if (user.drag) { user.yaw = clamp(user.drag.yaw - (e.clientX - user.drag.x) * 0.006, -1.2, 1.2); lastSig = ""; } });
+      const end = () => { user.drag = null; };
+      canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+      canvas.addEventListener("wheel", e => { e.preventDefault(); user.zoom = clamp(user.zoom * (e.deltaY < 0 ? 1.1 : 0.91), 0.6, 2.2); lastSig = ""; }, { passive: false });
+      canvas.addEventListener("dblclick", () => resetView());
+      canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); fail("Utracono grafikę 3D. Aktywny widok schematu."); });
+    }
+    function resetView() { user.yaw = 0; user.zoom = 1; lastSig = ""; }
+    function resize() {
+      const r = stage.getBoundingClientRect(); width = Math.max(1, r.width); height = Math.max(1, r.height);
+      renderer.setSize(width, height, false); lastSig = "";
+      // the 768px breakpoint changes the cards' max-width: measure every callout again
+      for (const item of callouts.values()) item.sig = "";
+    }
+
+    // ─── Init ───
+    async function init(config) {
+      options = config; stage = config.stage; labelsEl = config.labels; info.renderer = "loading";
+      try {
+        let timer;
+        try { THREE = await Promise.race([import(THREE_URL), new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("3D library timeout")), 10000); })]); }
+        finally { clearTimeout(timer); }
+        const css = getComputedStyle(document.documentElement);
+        for (const k of COLOR_KEYS) colors[k] = css.getPropertyValue("--world-" + k).trim() || css.getPropertyValue("--world-paper").trim();
+        options.font = css.getPropertyValue("--font-ui").trim();
+        if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+        renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+        renderer.domElement.className = "world-canvas"; renderer.domElement.setAttribute("role", "img");
+        renderer.domElement.setAttribute("aria-label", P.ariaLabel || "Świat 3D. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok.");
+        stage.prepend(renderer.domElement);
+        scene = new THREE.Scene(); scene.background = new THREE.Color(colors.background);
+        camera = new THREE.OrthographicCamera(-5, 5, 4, -4, 0.1, 90);
+        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 2.0));
+        sun = new THREE.DirectionalLight(colors.light, 3.0); sun.position.set(3, 14, 9); sun.target.position.set(7, 0, 2);
+        sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+        Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 9, bottom: -9, far: 40 }); sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0002;
+        scene.add(sun, sun.target);
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: colors.background, roughness: 1 }));
+        ground.rotation.x = -Math.PI / 2; ground.position.y = -0.25; ground.receiveShadow = true; scene.add(ground);
+        world = new THREE.Group(); scene.add(world); scratch = new THREE.Vector3();
+        S = product.create({
+          THREE, G, colors, refs, paths, info, options, world,
+          clamp, phase, ease, easeOutBack, lerp, v3, order, material, own, mesh, geo, box, cylinder, sphere, group, strip, canvasTexture,
+          makePath, reverseSegments, seeded, fakeText, paintMark, belt, plates, serverCabinet, rackMonitor, deskAt, chair, plant
+        });
+        buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();
+        S.build(); S.buildPaths();
+        buildPacket();
+        refs.employee = buildRobot("brand"); refs.adminBot = buildRobot("admin");
+        refs.adminBot.g.position.set(G.ADMIN.x, G.FLOOR, G.ADMIN.z + 0.62); refs.adminBot.g.rotation.y = Math.PI;
+        buildLabels();
+        resizeObserver = new ResizeObserver(resize); resizeObserver.observe(stage); resize();
+        bindInput(renderer.domElement);
+        info.renderer = "webgl";
+        if (config.onReady) config.onReady();
+      } catch (err) {
+        console.warn("3D unavailable, using the schematic view.", err);
+        fail("Widok uproszczony: grafika 3D niedostępna. Demo działa na schemacie.");
+      }
+    }
+    function fail(message) {
+      info.renderer = "fallback";
+      if (resizeObserver) resizeObserver.disconnect();
+      if (renderer) { renderer.domElement.remove(); renderer.dispose(); }
+      if (labelsEl) labelsEl.replaceChildren();
+      if (options.onFail) options.onFail(message);
+    }
+
     return { init, frame, resetView, debugCollisions, info: () => ({ ...info }) };
   }
 
-  return { create, G };
+  return { create };
 })();
