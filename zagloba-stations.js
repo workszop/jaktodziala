@@ -25,7 +25,7 @@ window.ZaglobaStations = {
       { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.13, 1.74], scenes: ["search", "access", "rank"] },
       { id: "index", text: "Baza wiedzy · indeks", color: "srcA", pos: [9.2, 1.1, 2.0], scenes: ["search"] },
       { id: "gate", text: "Kontrola uprawnień", color: "admin", pos: [10.05, 1.08, 2.7], scenes: ["access"] },
-      { id: "skipped", text: "Pominięte · brak uprawnień", color: "lockRed", pos: [9.95, 0.6, 3.45], scenes: ["access", "rank"] },
+      { id: "skipped", text: "Pominięte · brak uprawnień", color: "lockRed", pos: [9.72, 0.6, 3.16], scenes: ["access", "rank"] },
       { id: "podium", text: "Ocena trafności", color: "accent", pos: [10.9, 0.95, 2.3], scenes: ["rank"] },
       { id: "local", text: "Model lokalny · serwery GPU", color: "ok", pos: [12.25, 1.22, 2.75], scenes: ["model", "final"] },
       { id: "connectors", text: "Konektory źródeł", color: "admin", pos: [10.75, 1.86, 1.72], scenes: ["admin", "final"] },
@@ -49,7 +49,8 @@ window.ZaglobaStations = {
     const Z = window.ZaglobaData, CFG = window.ZaglobaStations.config;
     const SEARCH = [9.2, RIDE, 2.8], ACCESS = [10.05, RIDE, 2.8], RANK = [10.9, RIDE, 2.8], INLET = G.INLET;
     const STAGE_Z = 2.42, CARD = { w: 0.15, h: 0.2 };
-    const TRAY = [9.95, 0.32, 3.45];
+    // the skipped-documents tray: in front of the belt, left of the gate post, clear of the floor plates (label "skipped" sits above it)
+    const TRAY = [9.72, 0.32, 3.16];
     const PODIUM = [{ x: 10.9, h: 0.3 }, { x: 10.6, h: 0.22 }, { x: 11.2, h: 0.15 }], PODIUM_Z = 2.3;
     const SRC_TONE = Object.fromEntries(Z.SOURCE_IDS.map(sid => [sid, Z.SOURCES[sid].tone]));
     const CLOUD = Object.fromEntries(CFG.clouds.map(c => [c.key, c.pos]));
