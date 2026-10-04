@@ -28,7 +28,9 @@ window.WorldCore = (() => {
     monitor: { target: [2.6, 0.97, 2.1], span: 1.2, angle: 0.22, elev: 0.3 },
     rackOut: { target: [10.5, 0.6, 2.7], span: 3.9, angle: 0.62, elev: 0.6 },
     admin: { target: [5.9, 1.02, 4.05], span: 1.15, angle: 0.18, elev: 0.28 },
-    gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 }
+    gpu: { target: [12.0, 0.62, 3.0], span: 2.5, angle: 0.55, elev: 0.55 },
+    office: { target: [1.5, 0.6, 4.0], span: 4.6, angle: 0.62, elev: 0.6 }, // the robot waiting at the door and the desk it walks to
+    officeTall: { target: [1.7, 0.6, 3.9], span: 6.6, angle: 0.62, elev: 0.6 } // the same on a portrait screen, nearer the door
   };
   const BASE_LABELS = [
     { id: "desk", text: "Stanowisko pracownika", color: "brand", pos: [2.6, 1.5, 2.1], scenes: ["login", "send", "final"] },
@@ -55,7 +57,7 @@ window.WorldCore = (() => {
     const user = { yaw: 0, zoom: 1, drag: null };
     let labelItems = [], lastSig = "", settled = false, coSvg = null, scratch = null;
     const callouts = new Map();
-    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0 };
+    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0 };
 
     // ─── Helpers ───
     const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -530,6 +532,7 @@ window.WorldCore = (() => {
         ex = p.x; ez = p.z; if (u < 1) heading = Math.atan2(q.x - p.x, q.z - p.z); walk = u * paths.walk.getLength() * 16 * (u < 1 ? 1 : 0);
       }
       emp.g.position.set(ex, FLOOR, ez); emp.g.rotation.y = heading;
+      info.robot = id !== "login" ? "desk" : t < 0.04 ? "waiting" : t < 0.42 ? "walking" : "desk";
       const typing = id === "login" && t > 0.6 ? Math.sin(t * 60) * 0.2 : 0, reach = (id === "login" && t > 0.44) || id === "chat" ? -0.75 : 0;
       emp.limbs.forEach((limb, i) => {
         const leg = i % 2 === 0, side = i < 2 ? 1 : -1;
@@ -571,7 +574,7 @@ window.WorldCore = (() => {
     function desiredShot(s, poseOut) {
       const id = s.sceneId, t = s.t;
       const follow = (span, p = poseOut.packetPos) => ({ target: [p.x, p.y + 0.15, p.z], span, angle: 0.62, elev: 0.62 });
-      if (id === "login") { if (t > 0.44) return SHOTS.monitor; if (t < 0.1) return SHOTS.over; const e = refs.employee.g.position; return { target: [e.x, 0.6, e.z], span: 3.4, angle: 0.62, elev: 0.6 }; }
+      if (id === "login") { if (t > 0.44) return SHOTS.monitor; if (t < 0.1) return width < height ? SHOTS.officeTall : SHOTS.office; const e = refs.employee.g.position; return { target: [e.x, 0.6, e.z], span: 3.4, angle: 0.62, elev: 0.6 }; }
       if (id === "chat") return SHOTS.monitor;
       if (id === "send") return t > 0.9 || !poseOut.packetPos ? SHOTS.rackOut : follow(2.8);
       const custom = S.shot && S.shot(s, poseOut, follow, SHOTS);

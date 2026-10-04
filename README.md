@@ -27,6 +27,8 @@ Inside the server, **explanation callouts** are anchored to the stations (X-ray 
 
 Open `index.html` (the home page) or `klara.html` directly, or serve the folder with `python3 -m http.server`. There is no build step. Three.js 0.180 loads from jsDelivr; without it (or without WebGL) the demo switches to a schematic view and keeps working.
 
+**Start:** every simulation (on load, after `R` / *Od nowa*, and when the Auto loop ends) waits with the robot standing in the room; **Start** (button, `Space`, `Enter`, `→`) sends it to the computer to log in. Auto never leaves the start on its own and stays on when Start is pressed.
+
 **Keys:** `→`/`N`/`Space` next (the first press finishes the current animation), `←` back, `1–4` pick a prompt, `Enter` send, `A` switches Auto ↔ Krok po kroku (the app **starts in Auto**, a kiosk-style loop; pressing a button or a navigation key switches to step by step, rotating the 3D view does not), `R` restart, `H` help, `F` fullscreen. In the 3D view: drag to rotate, scroll to zoom, double-click to reset.
 
 **URL parameters:** `?auto=0` (start step by step) · `?auto=1` · `?scene=<id>&prompt=sensitive|routine|complex&policy=apiq|frontier|off` · `?speed=0.5–4` · `?selftest=1`.
@@ -68,6 +70,6 @@ node tests/zagloba.cjs
 PLAYWRIGHT_MODULE=/abs/path/playwright/index.mjs CHROME_PATH=/usr/bin/google-chrome node tests/browser.mjs
 ```
 
-The DOM contract lives on `#app`: `data-scene`, `data-phase`, `data-prompt`, `data-route`, `data-policy`, `data-packet` (expected) and `data-world-packet` (actual, from the 3D world). `App.probe()` checks the privacy, routing, masking, flow and world invariants; *Pomoc → Diagnostyka demo* runs the same probe.
+The DOM contract lives on `#app`: `data-scene`, `data-phase` (`idle` at the start, then `playing` / `done`), `data-prompt`, `data-route`, `data-policy`, `data-packet` (expected), `data-world-packet` (actual, from the 3D world) and `data-world-robot` (`waiting` / `walking` / `desk`); `App.start()` presses Start. `App.probe()` checks the privacy, routing, masking, flow and world invariants; *Pomoc → Diagnostyka demo* runs the same probe.
 
 All people, numbers and the company (Falkarton Sp. z o.o.) are fictional. The simulation never calls real models. Product statements follow https://quanticalab.ai/klara_website.html.

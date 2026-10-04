@@ -69,6 +69,14 @@ try {
   await page.goto(BASE); await ready(page);
   // default mode: Auto, advancing without input; dragging the 3D view keeps it; the switch goes to step by step
   check("starts in Auto mode", (await data(page)).auto === "true");
+  // every simulation starts idle: the robot stands in the room until Start, and Auto does not leave that on its own
+  const idleRobot = p => p.waitForFunction(() => { const s = document.getElementById("app").dataset; return s.phase === "idle" && s.worldRobot === "waiting"; }, null, { timeout: 10000 }).then(() => true, () => false);
+  check("starts idle with the robot standing in the room", await idleRobot(page) && await page.isVisible("#btnStart"));
+  await page.waitForTimeout(3000);
+  check("Auto waits for Start", (await data(page)).phase === "idle" && (await page.evaluate(() => App.probe())).ok);
+  await page.click("#btnStart");
+  check("Start: robot walks to the computer, Auto stays on", await page.waitForFunction(() => document.getElementById("app").dataset.worldRobot === "walking", null, { timeout: 10000 }).then(() => true, () => false)
+    && (await data(page)).auto === "true" && !(await page.isVisible("#btnStart")));
   await page.waitForFunction(() => document.getElementById("app").dataset.scene !== "login", null, { timeout: 45000 });
   check("Auto advances past the first scene on its own", true);
   const box = await page.locator(".world-canvas").boundingBox();
@@ -87,7 +95,8 @@ try {
   check("travelling sheet never passes through scene geometry", col.ok, (col.hits || []).slice(0, 3).map(h => h.scene + "@" + h.t0 + " " + h.mesh).join(" | "));
 
   // 2) real-time keyboard playthrough of a protected-data run
-  await page.keyboard.press("r"); await done(page);
+  await page.keyboard.press("r");
+  check("restart returns to the idle start", await idleRobot(page));
   const seen = await playthrough(page, "1");
   check("playthrough reaches the summary", seen.at(-1) === "final", seen.join(">"));
   check("one run recorded, routed locally", (await data(page)).runs === "1" && (await page.evaluate(() => App.state.runs[0].target)) === "local");
