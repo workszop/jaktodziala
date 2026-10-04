@@ -217,6 +217,7 @@ window.ZaglobaStations = {
       // Where every candidate card is in this scene and moment; non-candidates stay in their shelf slots.
       const id = s.sceneId, t = s.t, plan = {}, cand = d ? d.candidates : [], n = cand.length;
       const stage = (i, x) => v3([x + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]);
+      const tray = i => v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); // a skipped card's place in the tray, the same in every scene
       const slot = cid => v3(refs.slots[cid]);
       const rankIdx = cid => (d ? d.ranked.indexOf(cid) : -1);
       const podiumPos = r => v3([PODIUM[r].x, FLOOR + 0.12 + PODIUM[r].h + CARD.h / 2 + 0.01, PODIUM_Z]);
@@ -226,15 +227,15 @@ window.ZaglobaStations = {
         if (id === "search") { const u = ease(phase(t, 0.55 + i * 0.07, 0.75 + i * 0.07)); pos = slot(cid).lerp(stage(i, sheetX), u); }
         else if (id === "access") {
           const tc = 0.32 + i * 0.13;
-          if (skipped) { const stop = v3([9.8, 0.66, STAGE_Z]); pos = stage(i, sheetX < 9.8 ? sheetX : 9.8); if (t > tc) pos = stop.clone(); red = t > tc ? 1 : 0; lock = t > tc + 0.05; if (t > tc + 0.12) pos = stop.lerp(v3(TRAY).add(v3([0, 0.12, 0])), ease(phase(t, tc + 0.12, tc + 0.3))); }
-          else pos = stage(i, Math.min(sheetX, 9.85)).lerp(v3([10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]), ease(phase(t, tc, tc + 0.1)));
+          if (skipped) { const stop = v3([9.8, 0.66, STAGE_Z]); pos = stage(i, sheetX < 9.8 ? sheetX : 9.8); if (t > tc) pos = stop.clone(); red = t > tc ? 1 : 0; lock = t > tc + 0.05; if (t > tc + 0.12) pos = stop.lerp(tray(i), ease(phase(t, tc + 0.12, tc + 0.3))); }
+          else pos = stage(i, Math.min(sheetX, 9.85)).lerp(stage(i, 10.3), ease(phase(t, tc, tc + 0.1)));
         }
         else if (id === "rank") {
-          if (skipped) { pos = v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); red = 1; lock = true; }
-          else { const from = v3([10.3 + (i - (n - 1) / 2) * 0.22, 0.66, STAGE_Z]), u = ease(phase(t, 0.3 + i * 0.06, 0.55 + i * 0.06)); pos = r >= 0 ? from.lerp(podiumPos(r), u) : from; if (r < 0) scale = 1 - 0.97 * u; }
+          if (skipped) { pos = tray(i); red = 1; lock = true; }
+          else { const from = stage(i, 10.3), u = ease(phase(t, 0.3 + i * 0.06, 0.55 + i * 0.06)); pos = r >= 0 ? from.lerp(podiumPos(r), u) : from; if (r < 0) scale = 1 - 0.97 * u; }
         }
         else if (id === "model") {
-          if (skipped) { pos = v3(TRAY).add(v3([(i - 1) * 0.05, 0.12, 0])); red = 1; lock = true; }
+          if (skipped) { pos = tray(i); red = 1; lock = true; }
           else if (r >= 0) { const u = ease(phase(t, 0.05 + r * 0.04, 0.38)); pos = podiumPos(r).lerp(v3(GPU_IN), u); scale = k.swallowScale(id, t); }
           else vis = false;
         }

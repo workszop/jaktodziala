@@ -171,7 +171,7 @@
     dwell: { search: 4.5, access: 4.5, rank: 4 },
     calloutScenes: ["search", "access", "rank", "model"],
     // the admin panel's one setting: the user's access to the board folder (?access=board, App.setAccess, data-board-access)
-    setting: { key: "boardAccess", param: "access", attr: "boardAccess", dataKey: "access", api: "setAccess", coerce: Boolean, label: "Dostęp użytkownika do folderu Zarządu",
+    setting: { key: "boardAccess", param: "access", attr: "boardAccess", api: "setAccess", label: "Dostęp użytkownika do folderu Zarządu",
       options: [{ value: false, tag: "", label: "Brak dostępu", sub: "folder Zarządu niedostępny dla " + Z.USER.name },
         { value: true, param: "board", tag: "/zarząd", label: "Dostęp nadany", sub: "np. po delegowaniu do projektu inwestycji" }] },
     adminFrom: ["access", "rank"],

@@ -93,8 +93,8 @@ window.AppCore = (() => {
       });
     }
     // The product's one admin setting: options carry value, label, sub, optional URL `param` (default: the value) and self-test `tag`.
-    const coerce = v => (SET.coerce ? SET.coerce(v) : v);
-    function setSetting(v) { v = coerce(v); setSettings({ [SET.key]: v }, `[data-${SET.dataKey || SET.attr}="${v}"]`); }
+    // App.<api>(v) resolves v through the declared options ("false" is the option false); an unknown value is ignored.
+    function setSetting(v) { const o = SET.options.find(x => String(x.value) === String(v)); if (o) setSettings({ [SET.key]: o.value }, `.opt[data-value="${o.value}"]`); }
     const c = {}; // context handed to product hooks, filled once functions exist
     function snapshot() {
       const p = prompt(), d = p ? decision() : null, co = p ? H.calloutsFor(c, p, d) : [];
@@ -104,7 +104,7 @@ window.AppCore = (() => {
     // ─── Render: steps, panel, flow ───
     function buildSteps() {
       SCENES.forEach((s, i) => {
-        const li = el("li"), b = button("step", null, () => { if (i <= state.reached) goTo(i, { play: i !== state.scene }); });
+        const li = el("li"), b = button("step", null, () => { if (i > state.reached) return; if (state.idle && i === state.scene) begin(); else goTo(i, { play: i !== state.scene }); });
         b.dataset.scene = s.id; b.append(el("span", "n", s.n), el("span", "t", s.short)); b.title = s.n + " · " + s.title;
         li.appendChild(b); stepsEl.appendChild(li);
       });
@@ -248,7 +248,7 @@ window.AppCore = (() => {
       rt.append(el("b", null, a.rule[0]), el("div", null, a.rule[1])); rule.append(icon("lock"), rt);
       const opts = el("div", "opts"); opts.setAttribute("role", "radiogroup"); opts.setAttribute("aria-label", SET.label);
       for (const o of SET.options) {
-        const b = button("opt", null, () => setSetting(o.value)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings[SET.key] === o.value)); b.dataset[SET.dataKey || SET.attr] = String(o.value);
+        const b = button("opt", null, () => setSetting(o.value)); b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(state.settings[SET.key] === o.value)); b.dataset.value = String(o.value);
         const tx = el("div"); tx.append(el("b", null, o.label), el("small", null, o.sub)); b.append(el("i"), tx); opts.appendChild(b);
       }
       right.append(el("h4", null, a.settingsTitle), rule, ...(a.optsTitle ? [el("h4", null, a.optsTitle)] : []), opts, button("btn-admin", a.rerun[0], () => startRun(a.rerun[1])));
@@ -284,13 +284,14 @@ window.AppCore = (() => {
       ds.packet = done ? K.packetAt(sid(), d) : "moving"; ds.runs = String(state.runs.length);
       ds.auto = String(state.auto); ds.renderer = state.renderer; ds.reached = String(state.reached);
       if (H.contract) H.contract(c, ds, p, d);
-      ds[SET.attr] = String(coerce(state.settings[SET.key]));
+      ds[SET.attr] = String(state.settings[SET.key]);
       pProg.setAttribute("aria-valuenow", String(Math.round(state.t * 100)));
     }
     function renderScene() {
       const had = document.activeElement, focused = had && had !== document.body;
       renderSteps(); renderPanel(); state.progressKey = ""; onProgress();
-      if (focused && (!had.isConnected || had.closest("[inert]") || had.disabled)) btnNext.focus({ preventScroll: true });
+      // focus on a control that went away (detached, inert, disabled or hidden – Start once pressed) moves to the main one
+      if (focused && (!had.isConnected || had.closest("[inert]") || had.disabled || had.hidden || had.checkVisibility?.() === false)) (state.idle ? btnStart : btnNext).focus({ preventScroll: true });
     }
     function onProgress() {
       pProg.firstChild.style.width = (state.t * 100).toFixed(1) + "%";
@@ -459,8 +460,9 @@ window.AppCore = (() => {
     });
     const so = SET.options.find(o => (o.param ?? o.value) === PARAMS.get(SET.param));
     if (so) { state.settings = { ...state.settings, [SET.key]: so.value }; state.runSettings = { ...state.settings }; }
-    const pr = PARAMS.get("prompt"); if (pr && K.promptById(pr)) state.promptId = pr;
-    const sc = PARAMS.get("scene");
+    const pr = PARAMS.get("prompt"), sc = PARAMS.get("scene");
+    // a preset prompt that is still to be sent (no scene, or up to the chat) is a fresh run, logged like a chosen one
+    if (pr && K.promptById(pr)) { state.promptId = pr; state.fresh = !sc || IDX[sc] == null || IDX[sc] <= IDX.chat; }
     if (sc && IDX[sc] != null && (IDX[sc] <= IDX.chat || state.promptId)) { state.reached = IDX[sc]; goTo(IDX[sc], { play: PARAMS.get("play") === "1" }); }
     else goTo(0, { idle: true });
     // Auto is the default; deep links to a scene (presenters, tests) and ?auto=0 start step by step.

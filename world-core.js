@@ -272,7 +272,7 @@ window.WorldCore = (() => {
       box(x1 - 0.04, cz, 0.08, d, h, "rack", FLOOR);
       // lid + front cover open when the journey goes inside
       refs.lidMat = own("rackFace", { transparent: true, opacity: 1 });
-      refs.lid = box(cx, cz, w + 0.02, d + 0.02, 0.06, refs.lidMat, FLOOR + h);
+      refs.lid = box(cx, cz, w + 0.02, d + 0.02, 0.06, refs.lidMat, FLOOR + h); refs.lidY = refs.lid.position.y;
       const face = canvasTexture(1024, 256, (c, W, H) => {
         c.fillStyle = colors.rackFace; c.fillRect(0, 0, W, H);
         c.strokeStyle = colors.rackLine; c.lineWidth = 7;
@@ -286,7 +286,7 @@ window.WorldCore = (() => {
       const side = own("rackFace", { transparent: true, opacity: 1 }), front = own("paper", { map: face, transparent: true, opacity: 1 });
       refs.frontMats = [side, side, side, side, front, side];
       refs.front = mesh(geo("box", [w + 0.02, h, 0.06], () => new THREE.BoxGeometry(w + 0.02, h, 0.06)), refs.frontMats);
-      refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01);
+      refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01); refs.frontZ = refs.front.position.z; // closed places: pose() opens from them
       // the belt from the inlet, and two spare racks behind the GPU bay
       belt(8.475, 10.925);
       for (const x of [13.55, 13.9]) box(x, 0.6, 0.32, 0.7, 1.0, "rack", FLOOR, world, 0.02);
@@ -544,8 +544,8 @@ window.WorldCore = (() => {
       refs.adminMat.emissiveIntensity = id === "admin" || id === "final" ? 0.9 : 0.3;
       // rack opens in the first scene inside the server
       const oo = order(P.openScene), open = o < oo ? 0 : o === oo ? ease(phase(t, 0, 0.3)) : 1;
-      refs.lid.position.y = FLOOR + 1.1 + 0.03 + open * 1.6; refs.lidMat.opacity = 1 - open; refs.lid.visible = open < 0.99;
-      refs.front.position.z = 3.91 + open * 0.7; refs.frontMats.forEach(m => { m.opacity = 1 - open; m.depthWrite = open < 0.5; }); refs.front.visible = open < 0.99;
+      refs.lid.position.y = refs.lidY + open * 1.6; refs.lidMat.opacity = 1 - open; refs.lid.visible = open < 0.99;
+      refs.front.position.z = refs.frontZ + open * 0.7; refs.frontMats.forEach(m => { m.opacity = 1 - open; m.depthWrite = open < 0.5; }); refs.front.visible = open < 0.99;
       refs.lid.castShadow = refs.front.castShadow = open < 0.5;
       info.rackOpen = +open.toFixed(2);
       // cable glow

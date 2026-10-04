@@ -116,6 +116,38 @@ try {
   check("fallback probe (privacy + flow contract)", fp.ok, fp.failures.join(","));
   check("fallback blocks external routes", await f.evaluate(() => ["apiq", "frontier"].every(r => document.querySelector(`#flowBig [data-node="${r}"]`).dataset.state === "blocked")));
 
+  // 4b) shell regressions: the idle stepper, keyboard focus, deep-linked runs, reduced motion, the setting API
+  const g = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
+  await g.goto(BASE + "?auto=0"); await ready(g);
+  await g.click('.step[data-scene="login"]');
+  check("stepper 01 while idle acts as Start (the robot walks, not logged in at once)", (await data(g)).phase === "playing");
+  for (const key of ["Enter", " "]) {
+    await g.goto(BASE + "?auto=0"); await ready(g); await g.focus("#btnStart"); await g.keyboard.press(key);
+    check(`keyboard Start (${key === " " ? "Space" : key}) leaves focus on Dalej`, await g.evaluate(() => document.activeElement.id) === "btnNext");
+  }
+  await g.evaluate(() => App.goTo("final")); await g.focus("#final .final-actions button:nth-child(3)"); await g.keyboard.press("Enter");
+  check("Zacznij od nowa by keyboard puts focus on Start", await g.evaluate(() => document.activeElement.id) === "btnStart" && (await data(g)).phase === "idle");
+  for (const q of ["prompt=complex&scene=chat", "prompt=complex"]) {
+    await g.goto(BASE + "?auto=0&" + q); await ready(g);
+    const n = await g.evaluate(() => { for (const s of ["chat", "send", "scan", "gauge", "route", "model", "return", "admin", "final"]) App.goTo(s); return App.state.runs.length; });
+    check(`deep-linked prompt (${q}) is logged as a run`, n === 1, n + " runs");
+  }
+  await g.goto(BASE + "?auto=0&scene=admin&prompt=complex"); await ready(g);
+  const pol0 = (await data(g)).policy; await g.evaluate(() => App.setPolicy("bogus"));
+  check("App.setPolicy ignores an unknown policy", (await data(g)).policy === pol0, (await data(g)).policy);
+  await g.click('.opts [role="radio"]:nth-child(2)');
+  check("clicking a policy option selects it and keeps focus on it", (await data(g)).policy === "frontier" && await g.evaluate(() => document.activeElement.dataset.value) === "frontier");
+  await g.keyboard.press("ArrowDown");
+  check("arrow keys move the policy radio and its focus", (await data(g)).policy === "off" && await g.evaluate(() => document.activeElement.dataset.value) === "off");
+  await g.close();
+  const rm = watch(await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" }));
+  await rm.goto(BASE + "?auto=0");
+  const blink = await rm.evaluate(() => {
+    const f = document.createElement("label"), o = document.createElement("output"); f.className = "field"; o.className = "caret"; f.appendChild(o); document.body.appendChild(f);
+    const n = getComputedStyle(o, "::after").animationIterationCount; f.remove(); return n;
+  });
+  check("reduced motion stops the caret blink (pseudo-elements)", blink === "1", blink); await rm.close();
+
   // 5) Zagłoba: same shell and engine, its own invariants (permissions, citations, abstention)
   const z = watch(await browser.newPage({ viewport: { width: 1440, height: 860 } }));
   await z.goto(ROOT_URL + "zagloba.html" + "?auto=0"); await ready(z);
@@ -128,6 +160,16 @@ try {
   check("Zagłoba playthrough (restricted question) reaches the summary", zseen.at(-1) === "final", zseen.join(">"));
   const zrun = await z.evaluate(() => App.state.runs[0]);
   check("Zagłoba: board document skipped and never cited", zrun && zrun.skipped.includes("budzet") && !zrun.citations.includes("budzet"));
+  // the access setting resolves values through its declared options: "false" is not access, junk is ignored
+  await z.evaluate(() => App.goTo("admin"));
+  await z.evaluate(() => App.setAccess("false"));
+  check("App.setAccess(\"false\") leaves access off", (await data(z)).boardAccess === "false" && await z.evaluate(() => App.state.settings.boardAccess) === false);
+  await z.evaluate(() => App.setAccess("bogus"));
+  check("App.setAccess ignores an unknown value", (await data(z)).boardAccess === "false");
+  await z.evaluate(() => App.setAccess(true));
+  check("App.setAccess(true) grants access", (await data(z)).boardAccess === "true" && await z.evaluate(() => App.state.settings.boardAccess) === true);
+  await z.evaluate(() => App.setAccess(false)); await z.focus('.opts [role="radio"]'); await z.keyboard.press("ArrowDown");
+  check("Zagłoba: arrow keys move the access radio and its focus", (await data(z)).boardAccess === "true" && await z.evaluate(() => document.activeElement.dataset.value) === "true");
   const zm = watch(await browser.newPage({ viewport: { width: 390, height: 844 } }));
   await zm.goto(ROOT_URL + "zagloba.html" + "?scene=admin&prompt=restricted"); await ready(zm);
   check("Zagłoba: no horizontal overflow at 390px", await noOverflow(zm));
