@@ -32,15 +32,15 @@ try {
   await h.goto(ROOT_URL + "index.html");
   const hd = await h.evaluate(() => ({ ...document.getElementById("home").dataset, apps: [...document.querySelectorAll(".choice")].map(a => a.dataset.app + ">" + a.getAttribute("href")) }));
   check("home lists Klara and Zagłoba", hd.ready === "true" && hd.apps.join() === "klara>klara.html,zagloba>zagloba.html", hd.apps.join());
+  check("home: one top-level heading", await h.locator("h1").count() === 1);
   check("home: both scene visuals load", await h.evaluate(() => [...document.querySelectorAll(".choice img")].every(i => i.complete && i.naturalWidth > 0)));
-  await h.keyboard.press("2"); await h.waitForURL(/zagloba\.html$/);
-  check("home: key 2 opens Zagłoba", true);
-  await h.goto(ROOT_URL + "index.html"); await h.click('.choice[data-app="klara"]'); await h.waitForURL(/klara\.html$/);
-  check("home: clicking the Klara card opens Klara", true);
-  await h.click(".brand .home-link"); await h.waitForURL(/index\.html$/);
-  check("app logo links back home", true);
-  await h.goto(ROOT_URL + "index.html?scene=admin&prompt=complex"); await h.waitForURL(/klara\.html\?scene=admin&prompt=complex$/);
-  check("old index.html deep link redirects to Klara", true); await h.close();
+  // a navigation that never happens is a named failure, not an exception that skips the rest of the run
+  const lands = (act, url) => act().then(() => h.waitForURL(url, { timeout: 10000 })).then(() => true, () => false);
+  check("home: key 2 opens Zagłoba", await lands(() => h.keyboard.press("2"), /zagloba\.html$/));
+  check("home: clicking the Klara card opens Klara", await lands(async () => { await h.goto(ROOT_URL + "index.html"); await h.click('.choice[data-app="klara"]'); }, /klara\.html$/));
+  check("app logo links back home", await lands(() => h.click(".brand .home-link", { timeout: 10000 }), /index\.html$/));
+  check("old index.html deep link redirects to Klara", await lands(() => h.goto(ROOT_URL + "index.html?scene=admin&prompt=complex"), /klara\.html\?scene=admin&prompt=complex$/));
+  await h.close();
   const hm = watch(await browser.newPage({ viewport: { width: 390, height: 844 } }));
   await hm.goto(ROOT_URL + "index.html");
   check("home: no horizontal overflow at 390px", await hm.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await hm.close();

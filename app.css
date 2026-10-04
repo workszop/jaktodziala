@@ -50,7 +50,7 @@ button{font:inherit;color:inherit}
 .brand img{height:30px;width:auto;display:block}
 .brand .home-link{display:flex;flex:none;border-radius:var(--radius-sm)}
 .brand .divider{width:1px;height:28px;background:var(--chrome-line)}
-.brand h1{font-size:var(--fs-lg);font-weight:700;white-space:nowrap}
+.brand h1,.brand .title{font-size:var(--fs-lg);font-weight:700;white-space:nowrap}
 .brand .label{font-family:var(--font-mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--chrome-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tools{display:flex;gap:8px}
 .hbtn{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:var(--radius-pill);border:1px solid var(--chrome-line);background:transparent;color:var(--chrome-ink);font-size:var(--fs-sm);font-weight:600;cursor:pointer;transition:var(--transition);white-space:nowrap}
@@ -321,7 +321,7 @@ dialog h3{font-size:var(--fs-xl);margin-bottom:12px}
   .brand .label,.brand .divider,.hbtn .txt{display:none}
   .steps{padding:6px 10px}.step .t{display:none}.step{justify-content:center;padding:5px}
   .main{grid-template-columns:minmax(0,1fr);grid-template-rows:58vh auto}
-  .top{padding:8px 10px;gap:8px}.brand{gap:8px}.brand img{height:24px}.brand h1{font-size:var(--fs-md)}
+  .top{padding:8px 10px;gap:8px}.brand{gap:8px}.brand img{height:24px}.brand h1,.brand .title{font-size:var(--fs-md)}
   .hbtn{padding:7px 9px}.hbtn kbd{display:none}
   .modesw button{padding:5px 9px}.modesw kbd,.modesw .txt{display:none}
   .panel h2{font-size:var(--fs-xl)}

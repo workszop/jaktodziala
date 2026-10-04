@@ -189,7 +189,7 @@ window.WorldCore = (() => {
 
     // ─── Build: office ───
     // A desk with a monitor; the user sits on the +z side (rot turns it around its centre).
-    function deskAt(x, z, screenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }), rot = 0) {
+    function deskAt(x, z, screenMat = refs.deskScreenMat || (refs.deskScreenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 })), rot = 0) {
       const g = group(x, 0, z); g.rotation.y = rot;
       box(0, 0, 1.3, 0.66, 0.05, "wood", 0.7, g, 0.03);
       for (const dx of [-0.6, 0.6]) for (const dz of [-0.28, 0.28]) box(dx, dz, 0.05, 0.05, 0.7, "metal", 0, g);
@@ -215,6 +215,7 @@ window.WorldCore = (() => {
       const { DESK, ADMIN } = G;
       refs.screenMat = own("screen", { emissive: colors.screen, emissiveIntensity: 0.25, roughness: 0.3 });
       refs.mainScreen = deskAt(DESK.x, DESK.z, refs.screenMat);
+      plant(7.1, 5.6, 1.15); plant(7.15, 3.4, 0.9); // by the glass partition
       if (S.buildOffice) S.buildOffice();
       box(ADMIN.x, ADMIN.z, 0.5, 0.36, 0.78, "rack", 0, world, 0.04);
       const head = group(ADMIN.x, 0.86, ADMIN.z); head.rotation.x = -0.5;
@@ -276,8 +277,8 @@ window.WorldCore = (() => {
       refs.front = mesh(geo("box", [w + 0.02, h, 0.06], () => new THREE.BoxGeometry(w + 0.02, h, 0.06)), refs.frontMats);
       refs.front.position.set(cx, FLOOR + h / 2, z1 + 0.01);
     }
-    // A monitor perched on the rack's back panel: a clamp over the panel's top edge and a neck under the screen's centre,
-    // so the screen can turn towards the viewer without its mount leaving the panel. Products add the screen at (0, H / 2, 0.03).
+    // A monitor or board perched on the rack's back panel: a clamp over the panel's top edge and a neck under the screen's centre,
+    // so the screen can turn towards the viewer without its mount leaving the panel. Products add the face at (0, H / 2, 0.03).
     function rackMonitor(x, W, H, rot = 0.32) {
       const { FLOOR, RACK } = G, top = FLOOR + RACK.h, wallZ = RACK.cz - RACK.d / 2 + 0.04, lift = 0.17;
       box(x, wallZ, 0.24, 0.14, 0.03, "rackDark", top, world, 0.01);

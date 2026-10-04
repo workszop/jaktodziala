@@ -6,7 +6,7 @@ window.ZaglobaStations = {
     sceneOrder: ["login", "chat", "send", "search", "access", "rank", "model", "return", "admin", "final"],
     openScene: "search",
     travelScenes: ["search", "access", "rank", "model"],
-    colorKeys: ["srcA", "srcB", "srcC", "xrayBg", "xrayLine", "podium", "tube", "lockRed", "cabinet", "lampShade"],
+    colorKeys: ["srcA", "srcB", "srcC", "xrayBg", "xrayLine", "podium", "tube", "lockRed", "cabinet", "lampShade", "shelf"],
     // library-like office: three tall windows, a rug under the reading table
     office: { windows: { count: 3, w: 1.55, h: 0.56, y: 0.4 }, rug: [5.0, 2.1, 2.5, 2.1] },
     ports: [9.2],
@@ -23,7 +23,7 @@ window.ZaglobaStations = {
       sources: { target: [10.9, 2.2, -1.5], span: 5.4, angle: 0.5, elev: 0.3 }
     },
     labels: [
-      { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.25, 1.74], scenes: ["search", "access", "rank"] },
+      { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.13, 1.74], scenes: ["search", "access", "rank"] },
       { id: "index", text: "Baza wiedzy · indeks", color: "srcA", pos: [9.2, 1.1, 2.0], scenes: ["search"] },
       { id: "gate", text: "Kontrola uprawnień", color: "admin", pos: [10.05, 1.08, 2.7], scenes: ["access"] },
       { id: "skipped", text: "Pominięte · brak uprawnień", color: "lockRed", pos: [9.95, 0.6, 3.45], scenes: ["access", "rank"] },
@@ -36,7 +36,7 @@ window.ZaglobaStations = {
     ],
     anchors: {
       monitor: [8.6, 1.74, 1.94], index: [8.75, 0.9, 2.05], search: [9.2, 0.75, 3.1], gate: [10.05, 0.9, 3.2], skipped: [9.95, 0.42, 3.45],
-      podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], connectors: [10.75, 1.82, 1.72], sharepoint: [9.0, 3.5, -2.7]
+      podium: [11.2, 0.75, 2.3], local: [12.25, 1.1, 2.95], connectors: [10.75, 1.99, 1.8], sharepoint: [9.0, 3.5, -2.7]
     },
     ariaLabel: "Świat 3D: biuro, kabel do serwerowni, Quantica AI Server z bazą wiedzy i źródła danych organizacji. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok."
   },
@@ -64,9 +64,9 @@ window.ZaglobaStations = {
       refs.slots = {};
       const units = [8.88, 9.56], levels = [0.22, 0.47, 0.72];
       for (const ux of units) {
-        for (const dx of [-0.31, 0.31]) box(ux + dx, 2.0, 0.04, 0.3, 0.86, "wood", FLOOR + 0.12);
-        for (const ly of [...levels, 0.97]) box(ux, 2.0, 0.66, 0.3, 0.025, "wood", ly - 0.025);
-        box(ux, 1.87, 0.66, 0.02, 0.86, "wood", FLOOR + 0.12);
+        for (const dx of [-0.31, 0.31]) box(ux + dx, 2.0, 0.04, 0.3, 0.86, "shelf", FLOOR + 0.12);
+        for (const ly of [...levels, 0.97]) box(ux, 2.0, 0.66, 0.3, 0.025, "shelf", ly - 0.025);
+        box(ux, 1.87, 0.66, 0.02, 0.86, "shelf", FLOOR + 0.12);
         // decorative binders coloured by source
         const rnd = seeded(Math.round(ux * 100));
         levels.forEach((ly, li) => { for (let i = 0; i < 9; i++) { const tone = ["srcA", "srcB", "srcC", "paper"][Math.floor(rnd() * 4)]; box(ux - 0.26 + i * 0.065, 1.96, 0.05, 0.16, 0.16 + rnd() * 0.05, tone, ly); } });
@@ -125,9 +125,7 @@ window.ZaglobaStations = {
     }
     // Connectors board above the back panel: one lamp per source system.
     function buildConnectors() {
-      const W = 1.56, H = 0.66, g = group(10.75, FLOOR + 1.12, 1.66);
-      box(0, 0, W + 0.06, 0.05, H + 0.06, "rackDark", -0.03, g, 0.02);
-      for (const x of [-0.5, 0.5]) box(x, 0.02, 0.05, 0.05, 0.14, "metal", -0.14, g);
+      const W = 1.56, H = 0.66, g = k.rackMonitor(10.75, W, H, 0);
       const tex = canvasTexture(1024, 432, (c, w) => {
         c.fillStyle = colors.rackFace; c.fillRect(0, 0, w, 432);
         c.fillStyle = colors.admin; c.fillRect(0, 0, w, 74);
@@ -217,7 +215,7 @@ window.ZaglobaStations = {
       k.deskAt(6.4, 1.12); k.chair(6.4, 1.8, Math.PI);
       cylinder(3.85, 3.0, 0.13, 0.02, "metal"); cylinder(3.85, 3.0, 0.014, 1.18, "metal");
       cylinder(3.85, 3.0, 0.17, 0.16, own("lampShade", { emissive: colors.lampShade, emissiveIntensity: 0.35 }), 1.12, undefined, 0.1);
-      k.plant(0.45, 3.1, 1.2); k.plant(7.1, 5.6, 1.15); k.plant(7.15, 3.4, 0.9);
+      k.plant(0.45, 3.1, 1.2);
     }
     function build() {
       k.belt(8.475, 10.925);

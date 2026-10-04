@@ -82,7 +82,7 @@ body{overflow:auto}
     <div class="brand">
       <img src="assets/brand/quantica-logo-white.png" alt="Quantica Lab">
       <span class="divider" aria-hidden="true"></span>
-      <h1>Od środka</h1>
+      <p class="title">Od środka</p>
       <span class="label">interaktywne podróże 3D przez produkty AI</span>
     </div>
     <span class="hint">wybór: <kbd>1</kbd> <kbd>2</kbd></span>
@@ -119,25 +119,20 @@ body{overflow:auto}
     </ul>
 
     <p class="note">Symulacje poglądowe na danych przykładowych (fikcyjne osoby, dokumenty i firma). Nie wywołują rzeczywistych modeli.</p>
-    <div class="sr-only" id="announce" aria-live="polite"></div>
   </main>
 </div>
 <script>
 (() => {
   // ─── DOM refs ───
   const home = document.getElementById("home");
-  const announce = document.getElementById("announce");
   const choices = [...home.querySelectorAll(".choice")];
 
   // ─── Helpers ───
-  const open = choice => {
-    announce.textContent = "Otwieram: " + choice.querySelector("h2").textContent;
-    location.href = choice.getAttribute("href");
-  };
+  const open = choice => { location.href = choice.getAttribute("href"); };
 
   // ─── Listeners ───
   document.addEventListener("keydown", e => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const choice = choices.find(c => c.dataset.key === e.key);
     if (choice) { e.preventDefault(); open(choice); }
   });
