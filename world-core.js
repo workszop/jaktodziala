@@ -3,12 +3,13 @@
    The world is a pure function of a snapshot: { sceneId, t (0..1), prompt, decision, callouts, reduced, ... }.
    API: WorldCore.create(product) → { init({ stage, labels, onReady, onFail }), frame(snapshot, dt), resetView(), debugCollisions(), info() }
    Product: { config: { sceneOrder, openScene, travelScenes, shots, labels, anchors, colorKeys, ports, clouds, office: { windows, rug }, ariaLabel },
-              create(kit) → { buildOffice, build, buildPaths, pose, shot, labelVisible, labelState, sig, animating, collisionRuns } }
+              create(kit) → { buildOffice, build, buildPaths, pose, shot, labelVisible, labelState, sig, collisionRuns } }
    Colours come from --world-* tokens in the HTML shell; nothing here hardcodes a colour. */
 window.WorldCore = (() => {
   "use strict";
 
   // ─── Constants ───
+  // the HTML shells preload this same URL (<link rel="modulepreload">): change both together
   const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
   const CORE_COLORS = ["paper", "cream", "ink", "wood", "metal", "upholstery", "pot", "leaf", "leafLight", "screen", "wall", "wallServer",
     "glass", "foundation", "edge", "officeFloor", "serverFloor", "tileLine", "background", "light", "sky", "bounce", "brand", "admin", "accent",
@@ -60,7 +61,7 @@ window.WorldCore = (() => {
     const user = { yaw: 0, zoom: 1, drag: null, pointers: new Map(), pinch: null };
     let labelItems = [], lastSig = "", settled = false, coSvg = null, scratch = null;
     const callouts = new Map();
-    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0, blade: 0 };
+    const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", drawCalls: 0, triangles: 0, callouts: 0, attachments: 0, redactions: 0, blade: 0 };
 
     // ─── Helpers ───
     const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -557,7 +558,6 @@ window.WorldCore = (() => {
       refs.lid.position.y = refs.lidY + open * 1.6; refs.lidMat.opacity = 1 - open; refs.lid.visible = open < 0.99;
       refs.front.position.z = refs.frontZ + open * 0.7; refs.frontMats.forEach(m => { m.opacity = 1 - open; m.depthWrite = open < 0.5; }); refs.front.visible = open < 0.99;
       refs.lid.castShadow = refs.front.castShadow = open < 0.5;
-      info.rackOpen = +open.toFixed(2);
       // cable glow
       let glowU = 0;
       if (id === "send") glowU = clamp((ease(phase(t, 0.05, 0.95)) * refs.sendLen - refs.hopLen) / (refs.sendLen - refs.hopLen));
@@ -615,7 +615,6 @@ window.WorldCore = (() => {
       camera.left = -span * aspect / 2; camera.right = span * aspect / 2; camera.top = span / 2; camera.bottom = -span / 2;
       camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
       fitShadow(span * Math.max(aspect, 1 / Math.sin(Math.max(0.2, e))));
-      info.camera = shot === SHOTS.monitor ? "monitor" : shot === SHOTS.admin ? "admin" : shot === SHOTS.over ? "over" : "scene";
     }
     // Shadow map over the visible ground (`reach` across) around the camera target, snapped to whole texels.
     function fitShadow(reach) {
@@ -694,13 +693,12 @@ window.WorldCore = (() => {
       info.frames++;
       // the end state (t = 1) must always get its own frame: rounding alone would merge it with t = 0.99996
       const sig = [s.sceneId, s.t >= 1 ? "end" : s.t.toFixed(5), S.sig ? S.sig(s) : "", s.prompt ? s.prompt.id : "", s.calloutsSig || "", width, height, user.yaw, user.zoom].join("|");
-      const animating = S.animating ? S.animating(s) : false;
-      if (sig === lastSig && settled && !animating) return;
+      if (sig === lastSig && settled) return;
       lastSig = sig;
       const p = pose(s, dt);
       updateCamera(desiredShot(s, p), dt, s.reduced);
       updateLabels(s); updateCallouts(s);
-      renderer.render(scene, camera); info.renders++;
+      renderer.render(scene, camera); info.renders++; info.drawCalls = renderer.info.render.calls; info.triangles = renderer.info.render.triangles;
     }
 
     // ─── Diagnostics: does the travelling sheet pass through scene geometry? ───

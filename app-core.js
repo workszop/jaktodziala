@@ -101,9 +101,15 @@ window.AppCore = (() => {
     // App.<api>(v) resolves v through the declared options ("false" is the option false); an unknown value is ignored.
     function setSetting(v) { const o = SET.options.find(x => String(x.value) === String(v)); if (o) setSettings({ [SET.key]: o.value }); }
     const c = {}; // context handed to product hooks, filled once functions exist
+    // The world's input. It depends only on the scene, its time, the prompt and the settings in force (objects that are
+    // replaced, never mutated), so a frame on which none of them changed gets the snapshot built last time.
+    let snap = null, snapKey = [];
     function snapshot() {
+      const key = [state.scene, state.t, state.promptId, settings()];
+      if (snap && key.every((v, i) => v === snapKey[i])) return snap;
       const p = prompt(), d = p ? decision() : null, co = p ? H.calloutsFor(c, p, d) : [];
-      return { sceneId: sid(), t: state.t, prompt: p, decision: d, callouts: co, calloutsSig: JSON.stringify(co), reduced: REDUCED, ...(H.snapshotExtra ? H.snapshotExtra(c, p, d) : {}) };
+      snapKey = key;
+      return (snap = { sceneId: sid(), t: state.t, prompt: p, decision: d, callouts: co, calloutsSig: JSON.stringify(co), reduced: REDUCED, ...(H.snapshotExtra ? H.snapshotExtra(c, p, d) : {}) });
     }
 
     // ─── Render: steps, panel, flow ───

@@ -44,7 +44,7 @@ window.ZaglobaStations = {
     // ─── Constants ───
     const { THREE, G, colors, refs, paths, info, font } = k;
     const { box, cylinder, sphere, group, own, canvasTexture, makePath, fakeText, seeded, paintMark } = k;
-    const { clamp, phase, ease, lerp, v3, order } = k;
+    const { phase, ease, lerp, v3, order } = k;
     const { FLOOR, RIDE, GPU_IN } = G;
     const Z = window.ZaglobaData, CFG = window.ZaglobaStations.config;
     const SEARCH = [9.2, RIDE, 2.8], ACCESS = [10.05, RIDE, 2.8], RANK = [10.9, RIDE, 2.8], INLET = G.INLET;
