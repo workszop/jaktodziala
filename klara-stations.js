@@ -59,13 +59,20 @@ window.KlaraStations = {
     const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
     const RULE_HIT = ["danger", "ok", "accent"];
     const PAGE_FLAGS = [[0, 2], [1], [3]];
-    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle" });
+    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle", scanShell: 0 });
 
     // ─── Build: stations ───
     function buildXrayTunnel() {
       const x = SCAN[0], L = 0.9, z0 = 2.31, z1 = 3.29, base = FLOOR + 0.12, top = 0.82;
-      box(x, (z0 + z1) / 2, L, z1 - z0, 0.1, "xrayShell", top, undefined, 0.04);
-      for (const z of [z0 + 0.03, z1 - 0.03]) box(x, z, L, 0.06, top - base, "xrayShell", base);
+      // the roof and the wall facing the viewer turn see-through while the scanner works: the sheet inside shows what the monitor reports
+      refs.shellMat = own("xrayShell", { transparent: true, opacity: 1 });
+      refs.shell = [box(x, (z0 + z1) / 2, L, z1 - z0, 0.1, refs.shellMat, top, undefined, 0.04), box(x, z1 - 0.03, L, 0.06, top - base, refs.shellMat, base)];
+      box(x, z0 + 0.03, L, 0.06, top - base, "xrayShell", base);
+      // the beam: a sheet of light that sweeps along the tunnel
+      refs.beamMat = new THREE.MeshBasicMaterial({ color: colors.scan, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      refs.beam = new THREE.Mesh(new THREE.PlaneGeometry(0.62, top - base - 0.06), refs.beamMat);
+      refs.beam.rotation.y = Math.PI / 2; refs.beam.position.set(x, (top + base) / 2, 2.8); refs.beam.userData.noCollide = true; k.world.add(refs.beam);
+      refs.beamSpan = L / 2 - 0.1;
       refs.tunnelMat = own("scan", { emissive: colors.scan, emissiveIntensity: 0.1 });
       box(x, 2.8, L - 0.14, 0.3, 0.02, refs.tunnelMat, top - 0.02);
       const curtain = own("ink", { transparent: true, opacity: 0.5 });
@@ -223,6 +230,13 @@ window.KlaraStations = {
       // X-ray tunnel glows while the sheet is inside; the monitor shows message + attachment findings
       const scanning = id === "scan" && t > 0.4 && t < 0.88;
       refs.tunnelMat.emissiveIntensity = scanning ? 1.3 + 0.4 * Math.sin(t * 80) : 0.1; refs.beaconMat.emissiveIntensity = scanning ? 1.6 : 0;
+      // see-through shell from the moment the sheet goes in until it has left for the gauge; the beam sweeps there and back twice
+      const see = id === "scan" ? ease(phase(t, 0.34, 0.44)) : id === "gauge" ? 1 - ease(phase(t, 0.08, 0.3)) : 0;
+      refs.shellMat.opacity = 1 - 0.8 * see; refs.shellMat.depthWrite = see < 0.5; refs.shell.forEach(m => { m.castShadow = see < 0.5; });
+      const sweep = id === "scan" ? phase(t, 0.42, SCAN_T.masked) : 0, beamOn = sweep > 0 && sweep < 1;
+      refs.beam.visible = beamOn; refs.beamMat.opacity = beamOn ? 0.5 * Math.min(1, sweep * 12, (1 - sweep) * 12) : 0;
+      refs.beam.position.x = SCAN[0] - refs.beamSpan * Math.cos(sweep * Math.PI * 4);
+      info.scanShell = +see.toFixed(2);
       // protected data: found by the scanner (message words, then the attachment's pages once read), then masked
       const past = o > order("scan"), inScan = id === "scan";
       const found = past || (inScan && t > SCAN_T.found), docRead = past || (inScan && t > SCAN_T.read), masked = past || (inScan && t > SCAN_T.masked);
@@ -327,8 +341,7 @@ window.KlaraStations = {
     }
     return {
       buildOffice, build, buildPaths, pose, shot, labelVisible, labelState, collisionRuns,
-      sig: s => (s.decision ? s.decision.target + s.decision.states.apiq : ""),
-      animating: s => s.sceneId === "model" || s.sceneId === "return"
+      sig: s => (s.decision ? s.decision.target + s.decision.states.apiq : "")
     };
   }
 };

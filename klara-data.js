@@ -9,11 +9,12 @@
   const ORG = { name: "Falkarton Sp. z o.o.", note: "firma fikcyjna" };
   const USER = { name: "R. Bot", login: "r.bot", dept: "dział kadr", rights: "czat AI · analiza dokumentów · przygotowanie tekstów" };
 
-  // Where a request can be processed. `external` = leaves the organisation.
+  // Where a request can be processed. `external` = leaves the organisation; `inline` = the name inside a sentence
+  // (product names keep their capitals).
   const ROUTES = {
-    local: { title: "Model lokalny", where: "infrastruktura organizacji", external: false, cost: "bez opłat za API" },
-    apiq: { title: "Quantica APIQ", where: "modele hostowane przez Quantica", external: true, cost: "wg cennika Quantica APIQ" },
-    frontier: { title: "Frontier API", where: "OpenAI · Anthropic · Gemini", external: true, cost: "wg cennika dostawcy frontier API" }
+    local: { title: "Model lokalny", inline: "model lokalny", where: "infrastruktura organizacji", external: false, cost: "bez opłat za API" },
+    apiq: { title: "Quantica APIQ", inline: "Quantica APIQ", where: "modele hostowane przez Quantica", external: true, cost: "wg cennika Quantica APIQ" },
+    frontier: { title: "Frontier API", inline: "Frontier API", where: "OpenAI · Anthropic · Gemini", external: true, cost: "wg cennika dostawcy frontier API" }
   };
   const ROUTE_IDS = ["local", "apiq", "frontier"];
 
@@ -151,7 +152,7 @@
       checks: [
         sensitive.length ? "bezpieczeństwo danych: wykryto " + kinds.join(", ") + (fromAttachment ? " (także w załączniku)" : "") : "bezpieczeństwo danych: brak danych chronionych" + (prompt.attachment ? " (sprawdzono też załącznik)" : ""),
         "stopień złożoności: " + COMPLEXITY[level].label,
-        "decyzja o wyborze modelu: " + ROUTES[target].title.toLowerCase()
+        "decyzja o wyborze modelu: " + ROUTES[target].inline
       ],
       meta: ROUTES[target].external ? "na zewnątrz trafia wyłącznie treść zadania – bez danych chronionych · koszt: " + ROUTES[target].cost
         : "koszt: " + ROUTES[target].cost + " · dane: w organizacji"

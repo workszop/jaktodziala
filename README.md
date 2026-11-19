@@ -8,7 +8,7 @@ Open `index.html` (the home page), `klara.html` or `zagloba.html` directly, or s
 
 **Start:** every simulation (on load, after `R` / *Od nowa* / *Zacznij od nowa*, and when the Auto loop ends) waits with the robot standing in the room; **Start** (button, `Space`, `Enter`, `→`) sends it to the computer to log in. Auto never leaves the start on its own and stays on when Start is pressed.
 
-**Keys:** `→`/`N`/`Space`/`PageDown` next (the first press finishes the current animation), `←`/`PageUp` back, `1–4` pick a prompt in the chat (on the answer screen: start a new run with it), `Enter` send, `A` switches Auto ↔ Krok po kroku (the app **starts in Auto**, a kiosk-style loop; pressing a button or a navigation key switches to step by step, rotating the 3D view does not), `R` restart, `H`/`?` help, `F` fullscreen. Arrow keys move within a radio group (prompt chips, the admin setting). In the 3D view: drag to rotate, scroll to zoom, double-click to reset.
+**Keys:** `→`/`N`/`Space`/`PageDown` next (the first press finishes the current animation), `←`/`PageUp` back, `1–4` pick a prompt in the chat (on the answer screen: start a new run with it), `Enter` send, `A` switches Auto ↔ Krok po kroku (the app **starts in Auto**, a kiosk-style loop; pressing a button or a navigation key switches to step by step, rotating the 3D view does not), `R` restart, `H`/`?` help, `F` fullscreen. Arrow keys move within a radio group (prompt chips, the admin setting). In the 3D view: drag to rotate, scroll or pinch with two fingers to zoom, double-click to reset.
 
 **URL parameters** (both apps):
 
@@ -28,7 +28,7 @@ An interactive 3D walkthrough of **Klara – bezpieczny (i inteligentny) chat AI
 | 01 | Pulpit i logowanie | The robot walks to its desk. The monitor shows its desktop; the Klara icon opens a window and the robot logs in with an organisation account. |
 | 02 | Okno czatu | The Klara chat inside the desktop window. Pick one of 4 prompts: protected data / routine / complex / **attachment with company data**. |
 | 03 | Wysyłka | The prompt becomes a glowing packet that rides the cable to the **Quantica AI Server**. |
-| 04 | Skaner | The rack opens. The sheet passes through an **X-ray tunnel**; a preview monitor above the rack shows the message and the **attachment pages** side by side – protected fragments flash red, then turn into black redaction bars with tokens. |
+| 04 | Skaner | The rack opens. The sheet passes through an **X-ray tunnel** whose shell turns see-through while a beam sweeps over the sheet, so the marks on the sheet match the monitor; a preview monitor above the rack shows the message and the **attachment pages** side by side – protected fragments flash red, then turn into black redaction bars with tokens. |
 | 05 | Złożoność | A gauge rates task complexity. |
 | 06 | Zwrotnica i reguły | A **rules board** evaluates 3 rules one by one (protected data → complexity → policy) with lamps; barriers + padlocks close external exits; the chosen track lights green, blocked ones red. |
 | 07 | Model | Local route: a **cabinet of GPU servers** (one local model each) – the chosen server slides out and takes the sheet in. External: out through *Wyjście z organizacji* to the Quantica APIQ / Frontier API cloud. |
@@ -60,6 +60,7 @@ Invariant: a document the user cannot read is never cited (`tests/zagloba.cjs` +
 ## Files
 
 - `world-core.js` – the shared 3D engine (rooms, the employee's desk and admin console, robots, server shell, rack-top monitor mount, cable, sheet, clouds, GPU cabinet, labels, callouts, camera, collision probe). Each product furnishes its own office (`buildOffice`, `config.office` windows/rug, office colour tokens in its shell): Klara is a cool open space with a desk pod, coffee point and an orange lounge; Zagłoba a warm knowledge office with bookcases, a file cabinet and a reading table.
+  Rendering: image-based light baked once from a small studio scene (reflections on metal, screens and glass), a shadow map fitted to what the camera shows (sharp shadows in close-ups), a soft halo behind the travelling sheet, and frames drawn only when the snapshot, the camera or the view changed.
 - `app-core.js` + `app.css` – the shared app shell (state machine, stepper, panel, desktop and chat, Auto / Krok po kroku, DOM contract, probe, self-test).
 - `klara-stations.js`, `klara-app.js` / `zagloba-stations.js`, `zagloba-app.js` – each product's stations and content; the app file declares the product's one admin setting (URL parameter, `App.*` setter, `data-*` attribute, self-test matrix) and its contract and probe hooks.
 - `zagloba-data.js` – sources, documents, questions and the pure `decide(question, settings)` (permissions, re-ranking, abstention).

@@ -42,6 +42,9 @@ window.WorldCore = (() => {
   const PDF = { w: 0.17, h: 0.22, tex: [256, 332], max: 2 };
   const MSG_MARK_ROWS = [1, 3, 5], PDF_MARK_ROWS = [0, 1, 2, 3];
   const LIGHT_LIFT = [0, 0.3, 0.15]; // the carrier's glow light hovers above and in front of the sheet
+  // The sun sits at SUN_OFFSET from the point it lights. Its shadow map covers only what the camera shows (plus a margin),
+  // in fixed sizes so the shadow texels stay put while the camera settles: close-ups get sharp shadows from the same map.
+  const SUN_OFFSET = [-4, 14, 7], SHADOW = { map: 2048, sizes: [3, 4.5, 6.5, 9, 11], margin: 1.5 };
 
   function create(product) {
     const P = product.config;
@@ -49,12 +52,12 @@ window.WorldCore = (() => {
     const COLOR_KEYS = [...new Set([...CORE_COLORS, ...(P.colorKeys || [])])];
 
     // ─── State ───
-    let THREE = null, renderer, scene, camera, world, stage, labelsEl, resizeObserver, sun, S = null;
+    let THREE = null, renderer, scene, camera, world, stage, labelsEl, resizeObserver, sun, shadowSize = 0, S = null;
     let width = 1, height = 1, options = {};
     const fonts = { ui: "sans-serif", mono: "monospace" }; // resolved from --font-ui / --font-mono in init
     const colors = {}, materials = {}, geometries = new Map(), refs = {}, paths = {};
     const view = { target: null, span: 8.4, angle: 0.62, elev: 0.6 };
-    const user = { yaw: 0, zoom: 1, drag: null };
+    const user = { yaw: 0, zoom: 1, drag: null, pointers: new Map(), pinch: null };
     let labelItems = [], lastSig = "", settled = false, coSvg = null, scratch = null;
     const callouts = new Map();
     const info = { renderer: "loading", packetNode: "none", frames: 0, renders: 0, robot: "", rackOpen: 0, camera: "", callouts: 0, attachments: 0, redactions: 0, blade: 0 };
@@ -73,7 +76,7 @@ window.WorldCore = (() => {
     function material(name) {
       if (materials[name]) return materials[name];
       const isScreen = name === "screen", isMetal = name === "metal" || name === "lockMetal";
-      return (materials[name] = new THREE.MeshStandardMaterial({ color: colors[name] || colors.paper, roughness: isScreen ? 0.3 : 0.72, metalness: isMetal ? 0.42 : 0.03 }));
+      return (materials[name] = new THREE.MeshStandardMaterial({ color: colors[name] || colors.paper, roughness: isScreen ? 0.3 : isMetal ? 0.42 : 0.72, metalness: isMetal ? 0.55 : 0.03 }));
     }
     // A private material for anything that animates colour, glow or opacity.
     function own(name, extra = {}) {
@@ -182,7 +185,7 @@ window.WorldCore = (() => {
       box((gx1 + 14.2) / 2, 0.06, 14.2 - gx1, 0.12, 1.1, "wallServer");
       box((gx0 + gx1) / 2, 0.06, gx1 - gx0, 0.12, 1.1 - HOLE_TOP, "wallServer", HOLE_TOP);
       // glass partition between office and server room (door gap at z 4.4–5.4), with a cable pass-through in the lane
-      const glass = own("glass", { transparent: true, opacity: 0.32, depthWrite: false });
+      const glass = own("glass", { transparent: true, opacity: 0.32, depthWrite: false, roughness: 0.12 });
       const pass = [LANE_Z - 0.26, LANE_Z + 0.26], passTop = 0.52;
       for (const [z0, z1] of [[0.12, pass[0]], [pass[1], 4.4], [5.4, 6.0]]) {
         box(7.55, (z0 + z1) / 2, 0.04, z1 - z0, 1.0, glass);
@@ -504,6 +507,16 @@ window.WorldCore = (() => {
       const answerEdge = own("ok", { emissive: colors.ok, emissiveIntensity: 0.9 });
       refs.answer = buildSheet("ok", answerEdge, 11, 6).g;
       refs.allMarks = [...refs.msgMarks, ...refs.pdfs.flatMap(pdf => pdf.marks)];
+      // a soft halo behind each sheet (additive, so it shows in the dark rack and stays quiet on the light office floor)
+      const haloTex = canvasTexture(128, 128, (c, w) => {
+        const g = c.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+        g.addColorStop(0, "rgba(255,255,255,0.9)"); g.addColorStop(0.35, "rgba(255,255,255,0.28)"); g.addColorStop(1, "rgba(255,255,255,0)");
+        c.fillStyle = g; c.fillRect(0, 0, w, w);
+      });
+      for (const [carrier, tone] of [[refs.packet, "accent"], [refs.answer, "ok"]]) {
+        const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: colors[tone], blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
+        halo.scale.setScalar(0.95); halo.position.z = -0.05; carrier.add(halo);
+      }
       refs.light = new THREE.PointLight(colors.accent, 0, 1.6, 1.6); world.add(refs.light);
       refs.packet.visible = refs.answer.visible = false;
     }
@@ -529,7 +542,6 @@ window.WorldCore = (() => {
         const u = ease(phase(t, 0.04, 0.42)), p = paths.walk.getPointAt(u), q = paths.walk.getPointAt(Math.min(1, u + 0.01));
         ex = p.x; ez = p.z; if (u < 1) heading = Math.atan2(q.x - p.x, q.z - p.z); walk = u * paths.walk.getLength() * 16 * (u < 1 ? 1 : 0);
       }
-      emp.g.position.set(ex, FLOOR, ez); emp.g.rotation.y = heading;
       info.robot = id !== "login" ? "desk" : t < 0.04 ? "waiting" : t < 0.42 ? "walking" : "desk";
       const typing = id === "login" && t > 0.6 ? Math.sin(t * 60) * 0.2 : 0, reach = (id === "login" && t > 0.44) || id === "chat" ? -0.75 : 0;
       emp.limbs.forEach((limb, i) => {
@@ -563,6 +575,13 @@ window.WorldCore = (() => {
         carrier.visible = true; carrier.position.copy(out.pos);
         carrier.rotation.y = SHEET.facing + Math.sin(t * 9) * 0.04; carrier.scale.setScalar(SHEET.scale * (out.scale ?? 1));
       }
+      // the employee turns to watch the sheet leave and come back, and faces the screen again before the answer shows
+      const o0 = order("send"), o1 = order("return");
+      if (o >= o0 && o <= o1) {
+        const look = out.pos || v3(G.INLET), away = id === "send" ? ease(phase(t, 0.2, 0.4)) : id === "return" ? 1 - ease(phase(t, 0.74, 0.84)) : 1;
+        heading = lerp(Math.PI, Math.atan2(look.x - ex, look.z - ez), away);
+      }
+      emp.g.position.set(ex, FLOOR, ez); emp.g.rotation.y = heading;
       refs.light.intensity = carrier ? 1.0 : 0; if (carrier && out.pos) refs.light.position.set(out.pos.x + LIGHT_LIFT[0], out.pos.y + LIGHT_LIFT[1], out.pos.z + LIGHT_LIFT[2]);
       info.redactions = refs.allMarks.reduce((n, mk) => n + (mk.bar.visible ? 1 : 0), 0);
       return { packetPos: out.pos, carrier };
@@ -595,7 +614,16 @@ window.WorldCore = (() => {
       camera.lookAt(view.target);
       camera.left = -span * aspect / 2; camera.right = span * aspect / 2; camera.top = span / 2; camera.bottom = -span / 2;
       camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+      fitShadow(span * Math.max(aspect, 1 / Math.sin(Math.max(0.2, e))));
       info.camera = shot === SHOTS.monitor ? "monitor" : shot === SHOTS.admin ? "admin" : shot === SHOTS.over ? "over" : "scene";
+    }
+    // Shadow map over the visible ground (`reach` across) around the camera target, snapped to whole texels.
+    function fitShadow(reach) {
+      const r = SHADOW.sizes.find(v => v >= reach / 2 + SHADOW.margin) || SHADOW.sizes.at(-1), texel = 2 * r / SHADOW.map;
+      const x = Math.round(view.target.x / texel) * texel, z = Math.round(view.target.z / texel) * texel;
+      sun.target.position.set(x, 0, z); sun.position.set(x + SUN_OFFSET[0], SUN_OFFSET[1], z + SUN_OFFSET[2]);
+      if (r === shadowSize) return;
+      shadowSize = r; Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r }); sun.shadow.camera.updateProjectionMatrix();
     }
     function updateLabels(s) {
       const v = scratch;
@@ -715,9 +743,24 @@ window.WorldCore = (() => {
     // ─── Listeners ───
     function bindInput(canvas) {
       canvas.addEventListener("contextmenu", e => e.preventDefault());
-      canvas.addEventListener("pointerdown", e => { user.drag = { x: e.clientX, yaw: user.yaw }; canvas.setPointerCapture(e.pointerId); });
-      canvas.addEventListener("pointermove", e => { if (user.drag) { user.yaw = clamp(user.drag.yaw - (e.clientX - user.drag.x) * 0.006, -1.2, 1.2); lastSig = ""; } });
-      const end = () => { user.drag = null; };
+      // one pointer rotates; two pointers (touch screens, kiosks) pinch to zoom
+      const spread = () => { const [a, b] = [...user.pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+      canvas.addEventListener("pointerdown", e => {
+        user.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
+        if (user.pointers.size === 2) { user.drag = null; user.pinch = { spread: spread(), zoom: user.zoom }; }
+        else if (user.pointers.size === 1) user.drag = { x: e.clientX, yaw: user.yaw };
+      });
+      canvas.addEventListener("pointermove", e => {
+        if (!user.pointers.has(e.pointerId)) return;
+        user.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (user.pinch && user.pointers.size === 2) { user.zoom = clamp(user.pinch.zoom * spread() / user.pinch.spread, 0.6, 2.2); lastSig = ""; }
+        else if (user.drag) { user.yaw = clamp(user.drag.yaw - (e.clientX - user.drag.x) * 0.006, -1.2, 1.2); lastSig = ""; }
+      });
+      // lifting one of two fingers carries on as a rotation from where the other finger is
+      const end = e => {
+        user.pointers.delete(e.pointerId); user.pinch = null;
+        const rest = [...user.pointers.values()][0]; user.drag = rest ? { x: rest.x, yaw: user.yaw } : null;
+      };
       canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
       canvas.addEventListener("wheel", e => { e.preventDefault(); user.zoom = clamp(user.zoom * (e.deltaY < 0 ? 1.1 : 0.91), 0.6, 2.2); lastSig = ""; }, { passive: false });
       canvas.addEventListener("dblclick", () => resetView());
@@ -751,10 +794,11 @@ window.WorldCore = (() => {
         stage.prepend(renderer.domElement);
         scene = new THREE.Scene(); scene.background = new THREE.Color(colors.background);
         camera = new THREE.OrthographicCamera(-5, 5, 4, -4, 0.1, 90);
-        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 2.0));
-        sun = new THREE.DirectionalLight(colors.light, 3.0); sun.position.set(3, 14, 9); sun.target.position.set(7, 0, 2);
-        sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-        Object.assign(sun.shadow.camera, { left: -11, right: 11, top: 9, bottom: -9, far: 40 }); sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0002;
+        buildEnvironment();
+        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 1.5));
+        sun = new THREE.DirectionalLight(colors.light, 3.0);
+        sun.castShadow = true; sun.shadow.mapSize.set(SHADOW.map, SHADOW.map);
+        sun.shadow.camera.far = 40; sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0002;
         scene.add(sun, sun.target);
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: colors.background, roughness: 1 }));
         ground.rotation.x = -Math.PI / 2; ground.position.y = -0.25; ground.receiveShadow = true; scene.add(ground);
@@ -779,6 +823,18 @@ window.WorldCore = (() => {
         console.warn("3D unavailable, using the schematic view.", err);
         fail("Widok uproszczony: grafika 3D niedostępna. Demo działa na schemacie.");
       }
+    }
+    // Image-based light from a tiny studio (sky-coloured walls, a bright ceiling panel, a warm floor), baked once:
+    // it gives metal, screens and glass something to reflect and rounds off the flat fill light.
+    function buildEnvironment() {
+      const studio = new THREE.Scene(), pmrem = new THREE.PMREMGenerator(renderer);
+      const lit = (name, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(colors[name]).multiplyScalar(k), side: THREE.BackSide });
+      const wall = lit("sky", 0.85);
+      studio.add(new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), [wall, wall, lit("light", 1.6), lit("bounce", 0.7), wall, wall]));
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 7), new THREE.MeshBasicMaterial({ color: new THREE.Color(colors.light).multiplyScalar(5) }));
+      panel.position.set(-2, 5, 3); studio.add(panel);
+      scene.environment = pmrem.fromScene(studio, 0.04).texture; scene.environmentIntensity = 0.3;
+      pmrem.dispose(); studio.traverse(o => { if (o.isMesh) { o.geometry.dispose(); [].concat(o.material).forEach(m => m.dispose()); } });
     }
     function fail(message) {
       info.renderer = "fallback";

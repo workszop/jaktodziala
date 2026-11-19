@@ -18,6 +18,8 @@
   const items = p => K.protectedItems(p);
   const policyOf = c => c.settings().external;
   const policyLabel = id => K.POLICY_OPTIONS.find(o => o.id === id).label;
+  // the policy inside a sentence: a route keeps its product name, "Tylko modele lokalne" goes lower case
+  const policyInline = id => (K.ROUTES[id] ? K.ROUTES[id].inline : policyLabel(id).toLowerCase());
   function attChip(c, att) { const chip = c.el("div", "att"); chip.append(c.icon("clip"), c.el("b", null, att.name), c.el("small", null, att.meta)); return chip; }
   // Rule evaluation in the order the board shows it; the first rule that decides wins.
   function ruleSteps(c, p, d) {
@@ -100,13 +102,13 @@
             : d.level === "routine" ? "Proste i rutynowe zadania są obsługiwane przez modele lokalne, co ogranicza koszty korzystania z zewnętrznych usług AI."
             : "Do zadań standardowych wystarcza model lokalny działający w kontrolowanym środowisku."] };
         case "route": return { lead: "Zwrotnica łączy wynik skanera, miernika i polityki organizacji: " + d.reason + ".",
-          bullets: [d.badge, "Polityka dla zadań złożonych: " + policyLabel(policyOf(c)).toLowerCase() + (d.protectedCount ? " – nie ma tu znaczenia, bo dane chronione zawsze zostają w organizacji." : ".")] };
+          bullets: [d.badge, "Polityka dla zadań złożonych: " + policyInline(policyOf(c)) + (d.protectedCount ? " – nie ma tu znaczenia, bo dane chronione zawsze zostają w organizacji." : ".")] };
         case "model": return d.external
           ? { lead: "Na zewnątrz trafia wyłącznie treść zadania. Pakiet przechodzi przez wyjście z organizacji do: " + r.title + " (" + r.where + ").",
             bullets: [d.meta, "Model komercyjny wykorzystany tam, gdzie jego możliwości przynoszą rzeczywistą wartość."] }
           : { lead: "Zadanie realizuje lokalny model językowy działający w kontrolowanym środowisku – w tym samym serwerze.", bullets: [d.meta] };
         case "return": return { lead: "Odpowiedź wraca tą samą drogą do okna czatu. Użytkownik nie musi wiedzieć, który model najlepiej nadaje się do danego zadania – korzysta z jednego interfejsu.",
-          bullets: ["Obsłużono: " + r.title.toLowerCase() + " · " + d.badge + "."] };
+          bullets: ["Obsłużono: " + r.inline + " · " + d.badge + "."] };
         case "admin": return { lead: "Organizacja zachowuje kontrolę nad dostępnymi modelami, regułami kierowania zapytań oraz zasadami przetwarzania informacji. Centralne środowisko pozwala monitorować sposób korzystania z modeli.",
           bullets: ["Zmień politykę dla zadań złożonych i sprawdź, jak zmieni się trasa.", "Reguła ochrony danych działa niezależnie od tej polityki."] };
         default: return { lead: "Klara ogranicza zjawisko shadow AI: automatycznie chroni dane organizacji, dobiera model do rodzaju i złożoności zadania oraz ogranicza koszty.", bullets: [] };
@@ -142,9 +144,9 @@
     answerBody(c, run, bubble) {
       const p = K.promptById(run.promptId), r = K.ROUTES[run.target];
       bubble.appendChild(document.createTextNode(p.answer));
-      const m = c.el("div", "meta"); m.append(c.icon("ok"), c.el("span", null, "obsłużono: " + r.title.toLowerCase() + " · " + run.badge)); bubble.appendChild(m);
+      const m = c.el("div", "meta"); m.append(c.icon("ok"), c.el("span", null, "obsłużono: " + r.inline + " · " + run.badge)); bubble.appendChild(m);
     },
-    announce: (c, p, d) => "Odpowiedź Klary (" + K.ROUTES[d.target].title.toLowerCase() + "): " + p.answer,
+    announce: (c, p, d) => "Odpowiedź Klary (" + K.ROUTES[d.target].inline + "): " + p.answer,
     runLine: (c, r) => [K.promptById(r.promptId).label + (r.target !== "local" ? " · polityka: " + policyLabel(r.settings.external) : ""), K.ROUTES[r.target].title],
 
     // Admin console content; the core builds the panel around it with the policy options.
@@ -187,6 +189,7 @@
         if (state.scene >= IDX.send && state.scene <= IDX.model && wi.attachments !== (p.attachment ? 1 : 0)) failures.push("world-attachments:" + wi.attachments);
         if (state.scene > IDX.route && (wi.rules.match(/H/g) || []).length !== 1) failures.push("world-rules:" + wi.rules);
         if (ds.scene === "scan" && wi.scanView !== (prot ? "masked" : "clear")) failures.push("world-xray:" + wi.scanView);
+        if (wi.scanShell !== (ds.scene === "scan" ? 1 : 0)) failures.push("world-scan-shell:" + wi.scanShell);
         if (ds.scene === "model" && !d.external && wi.blade !== 0) failures.push("world-blade-left-open");
       }
     },
