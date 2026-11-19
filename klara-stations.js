@@ -21,7 +21,7 @@ window.KlaraStations = {
     },
     labels: [
       { id: "monitor", text: "Podgląd skanu", color: "scan", pos: [9.18, 2.13, 1.74], scenes: ["scan", "gauge"] },
-      { id: "scan", text: "Skaner rentgenowy", color: "scan", pos: [9.2, 1.06, 2.8], scenes: ["scan"] },
+      { id: "scan", text: "Skaner", color: "scan", pos: [9.2, 1.06, 2.8], scenes: ["scan"] },
       { id: "gauge", text: "Miernik złożoności", color: "accent", pos: [10.0, 1.18, 2.25], scenes: ["gauge"] },
       { id: "switch", text: "Zwrotnica", color: "accent", pos: [10.9, 0.8, 2.85], scenes: ["route"] },
       { id: "local", text: "Modele lokalne · serwery GPU", color: "ok", pos: [12.25, 1.22, 2.75], scenes: ["route", "model", "final"], route: "local" },
