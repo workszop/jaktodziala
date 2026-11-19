@@ -43,7 +43,7 @@
       if (id === "send" && t > 0.85) out.push({ id: "server", anchor: "server", side: "top", tone: "brand", kicker: "Quantica AI Server", title: "Decyzja zapada w organizacji",
         lines: [{ text: "polecenie dotarło do serwera organizacji", state: "ok" }, { text: "nic nie wychodzi na zewnątrz przed analizą", state: "on" }] });
       if (id === "scan") {
-        if (att && t > SCAN_T.found) out.push({ id: "monitor", anchor: "monitor", side: "left", tone: "scan", kicker: "Rentgen załącznika", title: att.name,
+        if (att && t > SCAN_T.found) out.push({ id: "monitor", anchor: "monitor", side: "left", tone: "scan", kicker: "Skan załącznika", title: att.name,
           lines: [{ text: att.meta, state: "muted" }, { text: t > 0.58 ? "przeczytano wszystkie strony" : "odczyt stron…", state: t > 0.58 ? "ok" : "muted" }, ...(t > SCAN_T.read ? attItems.map(found) : [])] });
         if (t > SCAN_T.found) out.push({ id: "scan", anchor: "scan", side: "left", tone: "scan", kicker: "Krok 1 · Skaner", title: "Bezpieczeństwo danych",
           lines: [...(own.length ? own.map(found) : [{ text: "treść polecenia: brak danych chronionych", state: "ok" }]),
@@ -87,34 +87,34 @@
     narration(c) {
       const id = c.sid(), p = c.prompt(), d = p ? c.decision() : null, r = d ? K.ROUTES[d.target] : null;
       switch (id) {
-        case "login": return { lead: "Robot siada przy komputerze. Na pulpicie czeka Klara – bezpieczny chat AI organizacji. Jedno okno, logowanie kontem organizacji.",
-          bullets: ["Bezpieczna i wygodna alternatywa dla publicznych chatów – ogranicza zjawisko shadow AI.", "Rozwiązanie może być dostosowane do struktury organizacyjnej i uprawnień poszczególnych użytkowników.", "Organizacja: " + K.ORG.name + " (" + K.ORG.note + ") · użytkownik: " + K.USER.name + ", " + K.USER.dept] };
+        case "login": return { lead: "Robot siada przy komputerze. Na pulpicie czeka Klara, bezpieczny chat AI organizacji. Wystarcza jedno okno i logowanie kontem organizacji.",
+          bullets: ["Klara jest bezpieczną i wygodną alternatywą dla publicznych chatów, więc ogranicza zjawisko shadow AI.", "Klarę można dostosować do struktury organizacji i uprawnień poszczególnych użytkowników.", "Organizacja: " + K.ORG.name + " (" + K.ORG.note + ") · użytkownik: " + K.USER.name + ", " + K.USER.dept] };
         case "chat": return { lead: "Pracownicy korzystają z Klary tak samo jak z popularnych chatów AI: wpisują polecenia, zadają pytania, analizują dokumenty i przygotowują teksty. Wybierz polecenie i wyślij je do Klary.",
-          bullets: ["Użytkownik nie wybiera modelu – Klara automatycznie wybiera ścieżkę realizacji zadania.", "Polecenie 4 ma załącznik – Klara sprawdza także treść załączonych dokumentów.", "Klawisze 1–4 wybierają polecenie, Enter wysyła."] };
-        case "send": return { lead: "Polecenie nie trafia prosto do internetu. Najpierw jedzie kablem do Quantica AI Server w serwerowni organizacji.",
-          bullets: ["Analiza i wybór modelu odbywają się lokalnie – w infrastrukturze organizacji.", "Na zewnątrz może trafić wyłącznie treść zadań, które mogą być przetwarzane poza organizacją."] };
+          bullets: ["Użytkownik nie wybiera modelu. Klara sama dobiera ścieżkę realizacji zadania.", "Polecenie 4 ma załącznik, a Klara sprawdza także treść załączonych dokumentów.", "Klawisze 1–4 wybierają polecenie, Enter wysyła."] };
+        case "send": return { lead: "Zanim cokolwiek trafi do internetu, polecenie jedzie kablem do Quantica AI Server w serwerowni organizacji.",
+          bullets: ["Analiza i wybór modelu odbywają się lokalnie, w infrastrukturze organizacji.", "Na zewnątrz może trafić wyłącznie treść zadań, które mogą być przetwarzane poza organizacją."] };
         case "scan": return p && d.fromAttachment && !p.sensitive.length
           ? { lead: "Skaner czyta polecenie i załączniki. Samo polecenie jest neutralne, ale w załączniku „" + p.attachment.name + "” wykryto: " + d.kinds.join(", ") + ".",
-            bullets: ["Bez załącznika to zadanie trafiłoby do modelu zewnętrznego – decyduje treść dokumentu, nie samo polecenie.", "Fragmenty z załącznika zostają oznaczone i zamaskowane; pakiet dostaje zakaz wyjścia poza organizację."] }
+            bullets: ["Bez załącznika to zadanie trafiłoby do modelu zewnętrznego. O trasie decyduje tu treść dokumentu.", "Fragmenty z załącznika zostają oznaczone i zamaskowane; pakiet dostaje zakaz wyjścia poza organizację."] }
           : p && d.protectedCount
-          ? { lead: "Skaner analizuje treść polecenia pod kątem bezpieczeństwa. Wykryto dane wymagające ochrony: " + d.kinds.join(", ") + ".",
+          ? { lead: "Skaner sprawdza treść polecenia. Wykrył dane wymagające ochrony: " + d.kinds.join(", ") + ".",
             bullets: ["Fragmenty zostają oznaczone i zamaskowane, a pakiet dostaje zakaz wyjścia poza organizację.", "Dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."] }
-          : { lead: "Skaner analizuje treść polecenia pod kątem bezpieczeństwa. Brak danych chronionych.",
-            bullets: ["To polecenie może być przetwarzane poza organizacją – o ile wymaga tego zadanie."] };
+          : { lead: "Skaner sprawdza treść polecenia. Nie znalazł danych chronionych.",
+            bullets: ["To polecenie może być przetwarzane poza organizacją, o ile wymaga tego zadanie."] };
         case "gauge": return !d.complexityChecked
-          ? { lead: "Skaner wykrył dane chronione, więc Klara nie sprawdza stopnia złożoności. Takie zadanie zawsze realizuje model lokalny – niezależnie od tego, jak jest trudne.",
+          ? { lead: "Skaner wykrył dane chronione, więc Klara nie sprawdza stopnia złożoności. Takie zadanie zawsze realizuje model lokalny, niezależnie od tego, jak jest trudne.",
             bullets: ["Miernik zostaje pominięty: kartka przejeżdża obok bez pomiaru.", "Dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."] }
           : { lead: "Miernik ocenia stopień złożoności: " + K.COMPLEXITY[d.level].label + ".",
           bullets: [d.level === "high" ? "Zadania szczególnie złożone i wymagające mogą trafić do wybranego modelu zewnętrznego, takiego jak GPT czy Gemini."
             : d.level === "routine" ? "Proste i rutynowe zadania są obsługiwane przez modele lokalne, co ogranicza koszty korzystania z zewnętrznych usług AI."
             : "Do zadań standardowych wystarcza model lokalny działający w kontrolowanym środowisku."] };
         case "route": return { lead: "Zwrotnica łączy wynik skanera, miernika i polityki organizacji: " + d.reason + ".",
-          bullets: [d.badge, "Polityka dla zadań złożonych: " + policyInline(policyOf(c)) + (d.protectedCount ? " – nie ma tu znaczenia, bo dane chronione zawsze zostają w organizacji." : ".")] };
+          bullets: [d.badge, "Polityka dla zadań złożonych: " + policyInline(policyOf(c)) + (d.protectedCount ? ", ale nie ma tu znaczenia, bo dane chronione zawsze zostają w organizacji." : ".")] };
         case "model": return d.external
           ? { lead: "Na zewnątrz trafia wyłącznie treść zadania. Pakiet przechodzi przez wyjście z organizacji do: " + r.title + " (" + r.where + ").",
-            bullets: [d.meta, "Model komercyjny wykorzystany tam, gdzie jego możliwości przynoszą rzeczywistą wartość."] }
-          : { lead: "Zadanie realizuje lokalny model językowy działający w kontrolowanym środowisku – w tym samym serwerze.", bullets: [d.meta] };
-        case "return": return { lead: "Odpowiedź wraca tą samą drogą do okna czatu. Użytkownik nie musi wiedzieć, który model najlepiej nadaje się do danego zadania – korzysta z jednego interfejsu.",
+            bullets: [d.meta, "Model komercyjny jest używany tam, gdzie jego możliwości są rzeczywiście potrzebne."] }
+          : { lead: "Zadanie realizuje lokalny model językowy działający w kontrolowanym środowisku, w tym samym serwerze.", bullets: [d.meta] };
+        case "return": return { lead: "Odpowiedź wraca tą samą drogą do okna czatu. Użytkownik nie musi wiedzieć, który model najlepiej nadaje się do danego zadania, bo korzysta z jednego interfejsu.",
           bullets: ["Obsłużono: " + r.inline + " · " + d.badge + "."] };
         case "admin": return { lead: "Organizacja zachowuje kontrolę nad dostępnymi modelami, regułami kierowania zapytań oraz zasadami przetwarzania informacji. Centralne środowisko pozwala monitorować sposób korzystania z modeli.",
           bullets: ["Zmień politykę dla zadań złożonych i sprawdź, jak zmieni się trasa.", "Reguła ochrony danych działa niezależnie od tej polityki."] };
@@ -214,7 +214,7 @@
       name: "Klara", mark: "K", tagline: "bezpieczny (i inteligentny) chat AI", chatPill: "model dobierany automatycznie",
       hello: "Dzień dobry! W czym mogę pomóc? Model dopasuję do zadania automatycznie.", history: ["Plan szkoleń na IV kwartał", "Podsumowanie spotkania działu"],
       chipsLabel: "Przykładowe polecenia", placeholder: "Wybierz przykładowe polecenie powyżej…", placeholderNext: "Wybierz kolejne polecenie powyżej…",
-      finalTitle: "Klara od środka – podsumowanie", finalSub: "Jedno okno czatu dla pracownika. Pełna kontrola nad danymi, modelami i kosztami po stronie organizacji.",
+      finalTitle: "Klara od środka – podsumowanie", finalSub: "Pracownik ma jedno okno czatu, a organizacja kontroluje dane, modele i koszty.",
       tryAnother: "Wypróbuj inne polecenie", adminAction: "Zmień politykę organizacji", otherPrompt: "Inne polecenie", adminJump: "Zmień politykę w panelu", sibling: { label: "Zobacz też: Zagłoba od środka", href: "zagloba.html" }
     },
     autoOrder: ["sensitive", "routine", "complex", "attachment"],

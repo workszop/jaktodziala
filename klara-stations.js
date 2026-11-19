@@ -199,7 +199,7 @@ window.KlaraStations = {
     }
     function build() {
       buildXrayTunnel(); buildGaugeAndSwitch(); buildRulesBoard();
-      refs.drawXray = k.rackScreen(SCAN[0] - 0.02, "PODGLĄD SKANU · RENTGEN TREŚCI", drawXray);
+      refs.drawXray = k.rackScreen(SCAN[0] - 0.02, "PODGLĄD SKANU · ANALIZA TREŚCI", drawXray);
       k.plates([[9.2, "1", "SKANER", "scan"], [10.0, "2", "ZŁOŻONOŚĆ", "accent"], [10.9, "3", "ZWROTNICA", "admin"], [12.25, "4", "MODELE LOKALNE", "ok"]]);
       buildTracks();
     }

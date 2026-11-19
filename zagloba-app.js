@@ -53,28 +53,28 @@
     narration(c) {
       const id = c.sid(), p = c.prompt(), d = p ? c.decision() : null;
       switch (id) {
-        case "login": return { lead: "Robot siada przy komputerze. Na pulpicie czeka Zagłoba – asystent wiedzy organizacji. Logowanie kontem organizacji przenosi role i uprawnienia użytkownika.",
-          bullets: ["Wiedza jest rozproszona między dokumentami, repozytoriami i systemami – Zagłoba daje do niej jeden, bezpieczny dostęp.", "Odpowiedzi są generowane wyłącznie na podstawie informacji, do których użytkownik ma uprawnienia.", "Organizacja: " + Z.ORG.name + " (" + Z.ORG.note + ") · użytkownik: " + Z.USER.name + ", " + Z.USER.dept] };
+        case "login": return { lead: "Robot siada przy komputerze. Na pulpicie czeka Zagłoba, asystent wiedzy organizacji. Logowanie kontem organizacji przenosi role i uprawnienia użytkownika.",
+          bullets: ["Wiedza jest rozproszona między dokumentami, repozytoriami i systemami, a Zagłoba daje do niej jeden bezpieczny dostęp.", "Odpowiedzi są generowane wyłącznie na podstawie informacji, do których użytkownik ma uprawnienia.", "Organizacja: " + Z.ORG.name + " (" + Z.ORG.note + ") · użytkownik: " + Z.USER.name + ", " + Z.USER.dept] };
         case "chat": return { lead: "Użytkownik zadaje pytanie tak, jak koledze z działu. Zagłoba przeszuka dostępne źródła, wybierze najtrafniejsze informacje i odpowie ze wskazaniem dokumentów.",
-          bullets: ["Pytanie 1 dotyczy procedury – jeden z pasujących dokumentów leży w folderze Zarządu, do którego użytkownik nie ma dostępu.", "Pytanie 2 nie ma pokrycia w bazie wiedzy.", "Klawisze 1–2 wybierają pytanie, Enter wysyła."] };
-        case "send": return { lead: "Pytanie jedzie do Quantica AI Server w serwerowni organizacji. Zagłoba może działać w pełni lokalnie – bez przekazywania dokumentów zewnętrznym dostawcom AI.",
+          bullets: ["Pytanie 1 dotyczy procedury. Jeden z pasujących dokumentów leży w folderze Zarządu, do którego użytkownik nie ma dostępu.", "Pytanie 2 nie ma pokrycia w bazie wiedzy.", "Klawisze 1–2 wybierają pytanie, Enter wysyła."] };
+        case "send": return { lead: "Pytanie jedzie do Quantica AI Server w serwerowni organizacji. Zagłoba może działać w pełni lokalnie, bez przekazywania dokumentów zewnętrznym dostawcom AI.",
           bullets: ["Organizacja zachowuje kontrolę nad miejscem przechowywania i przetwarzania danych.", "Koszty nie zależą od liczby zapytań do komercyjnych modeli językowych."] };
         case "search": return { lead: "Zagłoba przeszukuje bazę wiedzy połączoną z SharePoint, OneDrive i Amazon S3. Wyszukiwanie jest hybrydowe: semantyczne (znaczenie) i po słowach kluczowych.",
-          bullets: ["Dokumenty zostają w swoich systemach – nie trzeba ich przenosić do kolejnego repozytorium.", "Znaleziono " + d.candidates.length + " dokumenty kandydujące."] };
+          bullets: ["Dokumenty zostają w swoich systemach, więc nie trzeba ich przenosić do kolejnego repozytorium.", "Znaleziono " + d.candidates.length + " dokumenty kandydujące."] };
         case "access": return d.skipped.length
-          ? { lead: "Bramka sprawdza uprawnienia użytkownika do każdego znalezionego dokumentu. " + docTitle(d.skipped[0]) + " leży w folderze Zarządu – użytkownik nie ma do niego dostępu, więc dokument zostaje pominięty.",
+          ? { lead: "Bramka sprawdza uprawnienia użytkownika do każdego znalezionego dokumentu. " + docTitle(d.skipped[0]) + " leży w folderze Zarządu, do którego użytkownik nie ma dostępu, więc dokument zostaje pominięty.",
             bullets: ["Zachowane są istniejące role i poziomy dostępu.", "Pominięty dokument nie trafi do odpowiedzi ani do przypisów."] }
           : { lead: "Bramka sprawdza uprawnienia użytkownika do każdego znalezionego dokumentu. Wszystkie dokumenty kandydujące są dostępne dla tego użytkownika.",
             bullets: ["Odpowiedzi dla każdego użytkownika powstają wyłącznie z informacji, do których ma uprawnienia."] };
         case "rank": return { lead: "Ponowna ocena trafności porządkuje dostępne dokumenty. Do odpowiedzi trafiają tylko najtrafniejsze fragmenty" + (d.dropped.length ? "; " + d.dropped.length + " dokument odpada jako mało trafny." : "."),
-          bullets: [d.outcome === "answer" ? "Odpowiedź powstanie na podstawie " + d.ranked.length + " dokumentów – ze wskazaniem źródeł." : "Dostępne dokumenty nie odpowiadają na pytanie – nie będzie odpowiedzi spekulatywnej."] };
+          bullets: [d.outcome === "answer" ? "Odpowiedź powstanie na podstawie " + d.ranked.length + " dokumentów, ze wskazaniem źródeł." : "Dostępne dokumenty nie odpowiadają na pytanie, więc nie będzie odpowiedzi spekulatywnej."] };
         case "model": return d.outcome === "answer"
           ? { lead: "Lokalny model językowy przygotowuje odpowiedź wyłącznie z wybranych fragmentów i dodaje przypisy do dokumentów źródłowych.", bullets: ["Ogranicza to ryzyko odpowiedzi błędnych lub nieaktualnych.", "Użytkownik może zweryfikować informacje w materiałach źródłowych."] }
-          : { lead: "W bazie nie ma informacji, która odpowiada na pytanie. Zagłoba nie tworzy odpowiedzi spekulatywnej – informuje o braku danych i wskazuje właściwe źródło: " + d.redirect + ".", bullets: ["Obowiązujące dziś zasady są wskazane jako punkt odniesienia."] };
+          : { lead: "W bazie nie ma informacji, która odpowiada na pytanie. Zagłoba nie tworzy wtedy odpowiedzi spekulatywnej. Informuje o braku danych i wskazuje właściwe źródło: " + d.redirect + ".", bullets: ["Obowiązujące dziś zasady są wskazane jako punkt odniesienia."] };
         case "return": return { lead: "Odpowiedź wraca do okna Zagłoby razem z przypisami do dokumentów źródłowych.", bullets: [d.badge + "."] };
         case "admin": return { lead: "Organizacja łączy Zagłobę z istniejącymi repozytoriami i zarządza dostępem. Zmień uprawnienia użytkownika do folderu Zarządu i zadaj pytanie 1 ponownie.",
-          bullets: ["Synchronizacja w tle obejmuje nowe i zmienione dokumenty.", "Uprawnienia działają na poziomie każdego dokumentu."] };
-        default: return { lead: "Zagłoba daje szybki i bezpieczny dostęp do wiedzy organizacji – z odpowiedziami ze wskazaniem źródeł.", bullets: [] };
+          bullets: ["Synchronizacja w tle obejmuje nowe i zmienione dokumenty.", "Uprawnienia są sprawdzane dla każdego dokumentu osobno."] };
+        default: return { lead: "Zagłoba daje szybki i bezpieczny dostęp do wiedzy organizacji, a w odpowiedziach wskazuje źródła.", bullets: [] };
       }
     },
 
@@ -165,7 +165,7 @@
       name: "Zagłoba", mark: "Z", tagline: "inteligentny asystent wiedzy", chatPill: "odpowiedzi ze wskazaniem źródeł",
       hello: "Dzień dobry! Odpowiem na podstawie dokumentów organizacji i wskażę źródła.", history: ["Procedura urlopowa", "Zasady obiegu faktur"],
       chipsLabel: "Przykładowe pytania", placeholder: "Wybierz przykładowe pytanie powyżej…", placeholderNext: "Wybierz kolejne pytanie powyżej…",
-      finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Jedno okno pytań dla pracownika. Odpowiedzi tylko z dokumentów, do których ma uprawnienia – ze wskazaniem źródeł.",
+      finalTitle: "Zagłoba od środka – podsumowanie", finalSub: "Pracownik ma jedno okno pytań. Odpowiedzi powstają tylko z dokumentów, do których ma uprawnienia, i wskazują źródła.",
       tryAnother: "Zadaj inne pytanie", adminAction: "Zmień uprawnienia", otherPrompt: "Inne pytanie", adminJump: "Zmień uprawnienia w panelu", sibling: { label: "Zobacz też: Klara od środka", href: "klara.html" }
     },
     autoOrder: ["procedure", "nodata"],
