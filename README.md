@@ -48,10 +48,10 @@ The journey of a question through **Zagłoba – inteligentny asystent wiedzy** 
 | 02 | Pytanie | 2 questions: a procedure (one matching document sits in the board folder) · no coverage. |
 | 03 | Wysyłka | The question rides the cable to the server; Zagłoba can run fully on-premise. |
 | 04 | Wyszukiwanie | Hybrid search over the knowledge index (shelves synced with SharePoint, OneDrive, Amazon S3): keyword highlights on the sheet, beams to the candidate documents. |
-| 05 | Uprawnienia | A badge gate checks every candidate; a document from the board folder is stopped, locked and dropped into the "skipped" tray. |
+| 05 | Uprawnienia | A badge gate checks every candidate (its light curtain flashes green for a pass, red for a stop); a document from the board folder is stopped, locked and dropped into the "skipped" tray. |
 | 06 | Trafność | Re-ranking: the most relevant documents climb a podium (top 3), weak ones fade. |
 | 07 | Model | The local model (GPU server cabinet) answers only from the selected fragments – or abstains when the base has no coverage and names the right source. |
-| 08 | Odpowiedź | The answer in the chat with citation cards [1] [2] … |
+| 08 | Odpowiedź | The answer sheet travels back with one source card per cited document; the chat shows it with citation cards [1] [2] … |
 | 09 | Panel | Data sources with background sync, and the user's access to the board folder – grant it and ask question 1 again. |
 | 10 | Podsumowanie | Runs and the five benefits from the product page. |
 

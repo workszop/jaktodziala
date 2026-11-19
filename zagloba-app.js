@@ -34,7 +34,7 @@
       if (id === "access" && t > 0.3) out.push({ id: "gate", anchor: "gate", side: "right", tone: "admin", kicker: "Krok 2 · Kontrola uprawnień", title: USER_LINE,
         lines: d.candidates.filter((_, i) => t > 0.32 + i * 0.13).map(cid => d.skipped.includes(cid) ? { text: docTitle(cid) + " – BRAK DOSTĘPU, pominięty", state: "flag" } : { text: docTitle(cid) + " – dostęp", state: "ok" }) });
       if (id === "rank" && t > 0.35) out.push({ id: "podium", anchor: "podium", side: "right", tone: "accent", kicker: "Krok 3 · Ocena trafności",
-        title: d.ranked.length ? "Do odpowiedzi: " + d.ranked.length + " najtrafniejsze" : "Brak trafnych dokumentów",
+        title: d.ranked.length ? "Do odpowiedzi: " + (d.ranked.length === 1 ? "1 najtrafniejszy" : d.ranked.length + " najtrafniejsze") : "Brak trafnych dokumentów",
         lines: [...d.ranked.map((cid, i) => ({ text: (i + 1) + ". " + docTitle(cid) + " · " + Math.round(d.scores[cid].score * 100) + "%", state: "on" })),
           ...d.dropped.map(cid => ({ text: docTitle(cid) + " · za niska trafność", state: "muted" }))] });
       if (id === "model" && t > 0.42) out.push(d.outcome === "answer"
@@ -72,7 +72,7 @@
           ? { lead: "Lokalny model językowy przygotowuje odpowiedź wyłącznie z wybranych fragmentów i dodaje przypisy do dokumentów źródłowych.", bullets: ["Ogranicza to ryzyko odpowiedzi błędnych lub nieaktualnych.", "Użytkownik może zweryfikować informacje w materiałach źródłowych."] }
           : { lead: "W bazie nie ma informacji, która odpowiada na pytanie. Zagłoba nie tworzy odpowiedzi spekulatywnej – informuje o braku danych i wskazuje właściwe źródło: " + d.redirect + ".", bullets: ["Obowiązujące dziś zasady są wskazane jako punkt odniesienia."] };
         case "return": return { lead: "Odpowiedź wraca do okna Zagłoby razem z przypisami do dokumentów źródłowych.", bullets: [d.badge + "."] };
-        case "admin": return { lead: "Organizacja łączy Zagłobę z istniejącymi repozytoriami i zarządza dostępem. Zmień uprawnienia użytkownika do folderu Zarządu i zadaj pytanie 2 ponownie.",
+        case "admin": return { lead: "Organizacja łączy Zagłobę z istniejącymi repozytoriami i zarządza dostępem. Zmień uprawnienia użytkownika do folderu Zarządu i zadaj pytanie 1 ponownie.",
           bullets: ["Synchronizacja w tle obejmuje nowe i zmienione dokumenty.", "Uprawnienia działają na poziomie każdego dokumentu."] };
         default: return { lead: "Zagłoba daje szybki i bezpieczny dostęp do wiedzy organizacji – z odpowiedziami ze wskazaniem źródeł.", bullets: [] };
       }
@@ -148,6 +148,8 @@
         if (state.scene >= IDX.search && state.scene <= IDX.return && wi.monitorView !== "results") failures.push("world-monitor:" + wi.monitorView);
         if (state.scene >= IDX.search && state.scene <= IDX.model && wi.keywords < 1) failures.push("world-keywords");
         if (ds.scene === "model" && wi.blade !== 0) failures.push("world-blade-left-open");
+        if (wi.answerCites !== (ds.scene === "return" ? d.citations.length : 0)) failures.push("world-answer-cites:" + wi.answerCites);
+        if (wi.gateLight !== (ds.scene === "access" ? "on" : "idle")) failures.push("world-gate-light:" + wi.gateLight);
       }
     },
     selfTestCheck(c, results) {

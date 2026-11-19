@@ -19,7 +19,7 @@ window.ZaglobaStations = {
       search: { target: [9.3, 0.95, 2.3], span: 2.9, angle: 0.4, elev: 0.46 },
       access: { target: [10.0, 0.6, 2.75], span: 2.5, angle: 0.45, elev: 0.55 },
       rank: { target: [10.85, 0.62, 2.6], span: 2.4, angle: 0.42, elev: 0.5 },
-      sources: { target: [10.9, 2.2, -1.5], span: 5.4, angle: 0.5, elev: 0.3 }
+      sources: { target: [11.5, 2.2, -1.5], span: 6.6, angle: 0.5, elev: 0.3 }
     },
     labels: [
       { id: "monitor", text: "Podgląd wyszukiwania", color: "accent", pos: [9.18, 2.13, 1.74], scenes: ["search", "access", "rank"] },
@@ -55,7 +55,7 @@ window.ZaglobaStations = {
     const SRC_TONE = Object.fromEntries(Z.SOURCE_IDS.map(sid => [sid, Z.SOURCES[sid].tone]));
     const CLOUD = Object.fromEntries(CFG.clouds.map(c => [c.key, c.pos]));
     const DOC_IDS = Object.keys(Z.DOCS);
-    Object.assign(info, { candidates: 0, skippedShown: 0, podium: 0, keywords: 0, monitorView: "idle" });
+    Object.assign(info, { candidates: 0, skippedShown: 0, podium: 0, keywords: 0, monitorView: "idle", answerCites: 0, gateLight: "idle" });
 
     // ─── Build: knowledge index (two shelf units with binders and document cards) ───
     function buildIndex() {
@@ -99,8 +99,8 @@ window.ZaglobaStations = {
       // one beam per candidate, for the question with the most candidates
       const beams = Math.max(...Z.PROMPTS.map(p => p.candidates.length));
       refs.beams = Array.from({ length: beams }, (_, i) => {
-        const m = own(i % 2 ? "admin" : "accent", { emissive: colors[i % 2 ? "admin" : "accent"], emissiveIntensity: 1.3, transparent: true, opacity: 0.75 });
-        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 6), m); b.visible = false; b.userData.noCollide = true; k.world.add(b); return b;
+        const m = own(i % 2 ? "admin" : "accent", { emissive: colors[i % 2 ? "admin" : "accent"], emissiveIntensity: 1.3, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 1, 8), m); b.castShadow = false; b.visible = false; b.userData.noCollide = true; k.world.add(b); return b;
       });
     }
     // Access gate with a badge reader; a tray at the front for skipped documents.
@@ -111,6 +111,10 @@ window.ZaglobaStations = {
       box(x + 0.06, 3.25, 0.05, 0.12, 0.16, "chipMasked", 0.5);
       refs.readerMat = own("ok", { emissive: colors.ok, emissiveIntensity: 0.1 });
       sphere(x + 0.09, 0.62, 3.25, 0.025, refs.readerMat);
+      // a curtain of light in the gate: it flashes green for a document that passes and red for one that is stopped
+      refs.curtainMat = new THREE.MeshBasicMaterial({ color: colors.ok, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      refs.curtain = new THREE.Mesh(new THREE.PlaneGeometry(0.93, 0.68), refs.curtainMat);
+      refs.curtain.rotation.y = Math.PI / 2; refs.curtain.position.set(x, FLOOR + 0.48, 2.75); refs.curtain.userData.noCollide = true; k.world.add(refs.curtain);
       box(TRAY[0], TRAY[2], 0.36, 0.26, 0.05, "rackDark", FLOOR + 0.12, undefined, 0.02);
       box(TRAY[0], TRAY[2] + 0.12, 0.36, 0.02, 0.09, "lockRed", FLOOR + 0.12);
     }
@@ -196,6 +200,22 @@ window.ZaglobaStations = {
       cylinder(3.85, 3.0, 0.17, 0.16, own("lampShade", { emissive: colors.lampShade, emissiveIntensity: 0.35 }), 1.12, undefined, 0.1);
       k.plant(0.45, 3.1, 1.2);
     }
+    // Source cards clipped onto the answer sheet, one per cited document: the answer travels back with its sources.
+    // The engine builds the answer sheet after the stations, so this runs on the first pose.
+    function buildCites() {
+      const tilt = refs.answer.children[0];
+      refs.cites = [0, 1, 2].map(i => {
+        const tex = canvasTexture(140, 180, (c, w, h) => {
+          c.fillStyle = colors.paper; c.fillRect(0, 0, w, h); c.fillStyle = colors.accent; c.fillRect(0, 0, w, 54);
+          c.fillStyle = colors.paper; c.font = font(800, 38); c.textAlign = "center"; c.fillText("[" + (i + 1) + "]", w / 2, 40);
+          c.fillStyle = colors.rackLine; fakeText(c, 14, 84, w - 28, 4, 24, 8, seeded(50 + i));
+        });
+        const g = group(-0.082 + i * 0.082, -0.1, 0.006 + i * 0.002, tilt); g.rotation.z = 0.08 - i * 0.08; g.visible = false;
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(0.078, 0.098), k.own("chipMasked")); back.position.set(0.003, -0.003, -0.001); g.add(back);
+        g.add(new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.09), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, side: THREE.DoubleSide })));
+        return g;
+      });
+    }
     function build() {
       buildIndex(); buildCards(); buildSearch(); buildGate(); buildPodium(); buildConnectors();
       refs.drawMonitor = k.rackScreen(SEARCH[0] - 0.02, "PODGLĄD WYSZUKIWANIA · BAZA WIEDZY", drawMonitor);
@@ -278,6 +298,16 @@ window.ZaglobaStations = {
       info.candidates = shownCandidates; info.skippedShown = inTray; info.podium = onPodium;
       // access gate reader: green while passing, red when a document is stopped
       const stopped = id === "access" && d && d.skipped.length && t > 0.32 && t < 0.62;
+      // the curtain: a faint glow through the scene, a flash at each candidate's check (the same moments as the cards and the callout)
+      let flash = 0, flashTone = "ok";
+      if (id === "access" && d) d.candidates.forEach((cid, i) => { const tc = 0.32 + i * 0.13, f = phase(t, tc, tc + 0.03) * (1 - phase(t, tc + 0.05, tc + 0.12)); if (f > flash) { flash = f; flashTone = d.skipped.includes(cid) ? "danger" : "ok"; } });
+      refs.curtain.visible = id === "access"; refs.curtainMat.color.set(colors[flashTone]); refs.curtainMat.opacity = 0.07 + 0.5 * flash;
+      info.gateLight = id !== "access" ? "idle" : flash > 0 ? flashTone : "on";
+      // the answer carries one source card per cited document
+      if (!refs.cites) buildCites();
+      const cites = id === "return" && d ? d.citations.length : 0;
+      refs.cites.forEach((g, i) => { g.visible = i < cites; });
+      info.answerCites = Math.min(cites, refs.cites.length);
       refs.readerMat.color.set(colors[stopped ? "danger" : "ok"]); refs.readerMat.emissive.set(colors[stopped ? "danger" : "ok"]); refs.readerMat.emissiveIntensity = id === "access" ? 1.4 : 0.1;
       // results monitor
       let mv = { view: "idle" };
@@ -328,8 +358,7 @@ window.ZaglobaStations = {
     }
     return {
       buildOffice, build, buildPaths, pose, shot, labelVisible, collisionRuns,
-      sig: s => (s.decision ? s.decision.ranked.join(",") + "|" + s.decision.skipped.join(",") : ""),
-      animating: s => s.sceneId === "admin" || s.sceneId === "model" || s.sceneId === "return"
+      sig: s => (s.decision ? s.decision.ranked.join(",") + "|" + s.decision.skipped.join(",") : "")
     };
   }
 };
