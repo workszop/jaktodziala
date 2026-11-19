@@ -25,7 +25,7 @@
   function ruleSteps(c, p, d) {
     const lv = K.COMPLEXITY[d.level].label, pol = policyOf(c);
     const r1 = d.protectedCount ? { state: "hit", text: "1. Dane chronione? tak" + (d.fromAttachment ? " (w załączniku)" : "") + " → tylko model lokalny" } : { state: "pass", text: "1. Dane chronione? nie" };
-    const r2 = r1.state === "hit" ? { state: "skip", text: "2. Złożoność – pominięte, decyduje reguła 1" }
+    const r2 = r1.state === "hit" ? { state: "skip", text: "2. Złożoność – nie jest sprawdzana, decyduje reguła 1" }
       : d.level !== "high" ? { state: "hit", text: "2. Złożoność: " + lv + " → model lokalny" } : { state: "pass", text: "2. Złożoność: zadanie wymaga najbardziej zaawansowanego modelu" };
     const r3 = r1.state === "hit" || r2.state === "hit" ? { state: "skip", text: "3. Polityka – pominięte" }
       : { state: "hit", text: "3. Polityka organizacji: " + (pol === "off" ? "tylko modele lokalne → model lokalny" : K.ROUTES[d.target].title) };
@@ -48,9 +48,11 @@
         if (t > SCAN_T.found) out.push({ id: "scan", anchor: "scan", side: "left", tone: "scan", kicker: "Krok 1 · Skaner", title: "Bezpieczeństwo danych",
           lines: [...(own.length ? own.map(found) : [{ text: "treść polecenia: brak danych chronionych", state: "ok" }]),
             ...(att ? [{ text: t > SCAN_T.read ? "załącznik: " + attItems.length + " fragmenty chronione" : "załącznik: analiza…", state: t > SCAN_T.read ? "flag" : "muted" }] : []),
-            ...(t > 0.78 ? [prot ? { text: "pakiet oznaczony: zakaz wyjścia poza organizację", state: "flag" } : { text: "pakiet może wyjść poza organizację, jeśli wymaga tego zadanie", state: "ok" }] : [])] });
+            ...(t > 0.78 ? [prot ? { text: "pakiet oznaczony: zawsze model lokalny, zakaz wyjścia poza organizację", state: "flag" } : { text: "pakiet może wyjść poza organizację, jeśli wymaga tego zadanie", state: "ok" }] : [])] });
       }
-      if (id === "gauge" && t > 0.35) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "accent", kicker: "Krok 2 · Miernik złożoności",
+      if (id === "gauge" && t > 0.35 && !d.complexityChecked) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "accent", kicker: "Krok 2 · Miernik złożoności", title: "Pominięty",
+        lines: [{ text: "wykryto dane chronione", state: "flag" }, { text: "złożoność nie jest sprawdzana", state: "muted" }, { text: "zawsze przetwarzanie lokalne", state: "on" }] });
+      else if (id === "gauge" && t > 0.35) out.push({ id: "gauge", anchor: "gauge", side: "right", tone: "accent", kicker: "Krok 2 · Miernik złożoności",
         title: t > 0.85 ? "Ocena: " + K.COMPLEXITY[d.level].label : "Ocena złożoności…",
         lines: [["routine", "proste i rutynowe → model lokalny"], ["standard", "standardowe → model lokalny"], ["high", "najbardziej wymagające → model zewnętrzny, jeśli pozwala polityka"]]
           .map(([lv, text]) => ({ text, state: t > 0.85 && d.level === lv ? "on" : "muted" })) });
@@ -75,6 +77,8 @@
 
     // Flow extras on top of the core's packet path: the routes light up once the switch has decided.
     flowStates(c, st, id, t, d) {
+      // a skipped gauge shows as passed by (dashed), never as the place where the packet is
+      if (d && !d.complexityChecked && c.IDX[id] >= c.IDX.gauge) st.gauge = "alt";
       if (!d || !(c.IDX[id] > c.IDX.route || (id === "route" && t >= 0.7))) return;
       for (const r of K.ROUTE_IDS) { const s = d.states[r]; st[r] = s === "on" ? "chosen" : s === "faded" ? "idle" : s; }
       if (id === "model") st[d.target] = "active";
@@ -97,7 +101,10 @@
             bullets: ["Fragmenty zostają oznaczone i zamaskowane, a pakiet dostaje zakaz wyjścia poza organizację.", "Dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."] }
           : { lead: "Skaner analizuje treść polecenia pod kątem bezpieczeństwa. Brak danych chronionych.",
             bullets: ["To polecenie może być przetwarzane poza organizacją – o ile wymaga tego zadanie."] };
-        case "gauge": return { lead: "Miernik ocenia stopień złożoności: " + K.COMPLEXITY[d.level].label + ".",
+        case "gauge": return !d.complexityChecked
+          ? { lead: "Skaner wykrył dane chronione, więc Klara nie sprawdza stopnia złożoności. Takie zadanie zawsze realizuje model lokalny – niezależnie od tego, jak jest trudne.",
+            bullets: ["Miernik zostaje pominięty: kartka przejeżdża obok bez pomiaru.", "Dane wymagające ochrony nie są przekazywane do zewnętrznych dostawców modeli AI."] }
+          : { lead: "Miernik ocenia stopień złożoności: " + K.COMPLEXITY[d.level].label + ".",
           bullets: [d.level === "high" ? "Zadania szczególnie złożone i wymagające mogą trafić do wybranego modelu zewnętrznego, takiego jak GPT czy Gemini."
             : d.level === "routine" ? "Proste i rutynowe zadania są obsługiwane przez modele lokalne, co ogranicza koszty korzystania z zewnętrznych usług AI."
             : "Do zadań standardowych wystarcza model lokalny działający w kontrolowanym środowisku."] };
@@ -189,6 +196,7 @@
         if (state.scene >= IDX.send && state.scene <= IDX.model && wi.attachments !== (p.attachment ? 1 : 0)) failures.push("world-attachments:" + wi.attachments);
         if (state.scene > IDX.route && (wi.rules.match(/H/g) || []).length !== 1) failures.push("world-rules:" + wi.rules);
         if (ds.scene === "scan" && wi.scanView !== (prot ? "masked" : "clear")) failures.push("world-xray:" + wi.scanView);
+        if (state.scene >= IDX.gauge && state.scene <= IDX.return && wi.gauge !== (prot ? "skipped" : "read")) failures.push("world-gauge:" + wi.gauge);
         if (wi.scanShell !== (ds.scene === "scan" ? 1 : 0)) failures.push("world-scan-shell:" + wi.scanShell);
         if (ds.scene === "model" && !d.external && wi.blade !== 0) failures.push("world-blade-left-open");
       }

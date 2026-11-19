@@ -29,7 +29,7 @@ An interactive 3D walkthrough of **Klara – bezpieczny (i inteligentny) chat AI
 | 02 | Okno czatu | The Klara chat inside the desktop window. Pick one of 4 prompts: protected data / routine / complex / **attachment with company data**. |
 | 03 | Wysyłka | The prompt becomes a glowing packet that rides the cable to the **Quantica AI Server**. |
 | 04 | Skaner | The rack opens. The sheet passes through an **X-ray tunnel** whose shell turns see-through while a beam sweeps over the sheet, so the marks on the sheet match the monitor; a preview monitor above the rack shows the message and the **attachment pages** side by side – protected fragments flash red, then turn into black redaction bars with tokens. |
-| 05 | Złożoność | A gauge rates task complexity. |
+| 05 | Złożoność | A gauge rates task complexity. With protected data it is skipped (needle at rest, a *POMINIĘTE* sign): such a task is always processed locally. |
 | 06 | Zwrotnica i reguły | A **rules board** evaluates 3 rules one by one (protected data → complexity → policy) with lamps; barriers + padlocks close external exits; the chosen track lights green, blocked ones red. |
 | 07 | Model | Local route: a **cabinet of GPU servers** (one local model each) – the chosen server slides out and takes the sheet in. External: out through *Wyjście z organizacji* to the Quantica APIQ / Frontier API cloud. |
 | 08 | Odpowiedź | The answer travels back to the chat, labelled with the model that handled it. |

@@ -37,6 +37,15 @@ test("routine and standard tasks stay local; complex follows policy", () => {
   assert.strictEqual(K.decide(null, K.DEFAULT_SETTINGS), null);
 });
 
+test("protected data: complexity is not assessed and the route is local, whatever the task's complexity or the policy", () => {
+  for (const level of Object.keys(K.COMPLEXITY)) for (const o of K.POLICY_OPTIONS) {
+    const d = K.decide({ ...K.promptById("sensitive"), complexity: level }, { external: o.id });
+    assert.strictEqual(d.complexityChecked, false); assert.strictEqual(d.target, "local", level + "/" + o.id);
+    assert.ok(d.checks[1].includes("nie jest sprawdzany"), d.checks[1]);
+  }
+  for (const id of ["routine", "complex"]) assert.strictEqual(K.decide(K.promptById(id), K.DEFAULT_SETTINGS).complexityChecked, true);
+});
+
 test("sensitive fragments exist verbatim in their prompt text or attachment", () => {
   for (const p of K.PROMPTS) for (const s of p.sensitive) assert.ok(p.text.includes(s.text), s.text);
   for (const p of K.PROMPTS.filter(p => p.attachment)) for (const s of p.attachment.sensitive) assert.ok(p.attachment.lines.some(l => l.includes(s.text)), s.text);

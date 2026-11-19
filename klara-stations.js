@@ -59,7 +59,7 @@ window.KlaraStations = {
     const RULE_TEXT = ["Dane chronione (także w załącznikach) → tylko model lokalny", "Zadanie proste lub standardowe → model lokalny", "Zadanie złożone → model zewnętrzny wg polityki"];
     const RULE_HIT = ["danger", "ok", "accent"];
     const PAGE_FLAGS = [[0, 2], [1], [3]];
-    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle", scanShell: 0 });
+    Object.assign(info, { arrow: "neutral", barriers: "up", rules: "", scanView: "idle", scanShell: 0, gauge: "rest" });
 
     // ─── Build: stations ───
     function buildXrayTunnel() {
@@ -128,6 +128,13 @@ window.KlaraStations = {
       for (const [c, start, len] of zones) {
         const ring = new THREE.Mesh(new THREE.RingGeometry(0.17, 0.235, 24, 1, start, len), own(c, { side: THREE.DoubleSide })); ring.position.z = 0.022; dial.add(ring);
       }
+      // a sign across the dial when the gauge is not used: protected data always stays with the local model
+      const skipTex = k.canvasTexture(512, 128, (c, w, h) => {
+        c.fillStyle = colors.ink; c.beginPath(); if (c.roundRect) c.roundRect(0, 0, w, h, 26); else c.rect(0, 0, w, h); c.fill();
+        c.fillStyle = colors.paper; c.font = font(800, 62); c.textAlign = "center"; c.fillText("POMINIĘTE", w / 2, 86);
+      });
+      refs.gaugeSkip = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.125), new THREE.MeshBasicMaterial({ map: skipTex, transparent: true, toneMapped: false }));
+      refs.gaugeSkip.position.set(0, 0, 0.07); refs.gaugeSkip.rotation.z = 0.14; refs.gaugeSkip.visible = false; refs.gaugeSkip.userData.noCollide = true; dial.add(refs.gaugeSkip);
       refs.needle = group(0, 0, 0.03, dial); box(0, 0, 0.022, 0.012, 0.21, "ink", 0, refs.needle); sphere(0, 0, 0.008, 0.03, "ink", dial);
       cylinder(SWITCH[0], SWITCH[2], 0.22, 0.1, "metal", FLOOR + 0.12, undefined, 0.22, 28);
       refs.arrow = group(SWITCH[0], FLOOR + 0.225, SWITCH[2]);
@@ -251,11 +258,15 @@ window.KlaraStations = {
         att: att && xv !== "idle" ? { name: att.name, items: attItems.map(i => ({ token: i.token, kind: i.kind })) } : null, attState });
       info.scanView = xv;
       // gauge needle
-      const level = d ? K.COMPLEXITY[d.level].needle : 0;
+      // protected data: the gauge is skipped (needle at rest, a sign across the dial) – the route is local whatever the complexity
+      const level = d ? K.COMPLEXITY[d.level].needle : 0, skipGauge = !!d && !d.complexityChecked;
       let needle = NEEDLE_REST;
-      if (id === "gauge") needle = NEEDLE_REST + (-level - NEEDLE_REST) * easeOutBack(phase(t, 0.3, 0.85));
-      else if (o > order("gauge")) needle = -level;
+      if (!skipGauge && id === "gauge") needle = NEEDLE_REST + (-level - NEEDLE_REST) * easeOutBack(phase(t, 0.3, 0.85));
+      else if (!skipGauge && o > order("gauge")) needle = -level;
       refs.needle.rotation.z = needle;
+      const skipU = !skipGauge ? 0 : id === "gauge" ? easeOutBack(phase(t, 0.3, 0.5)) : o > order("gauge") && o <= order("return") ? 1 : 0;
+      refs.gaugeSkip.visible = skipU > 0.01; refs.gaugeSkip.scale.setScalar(Math.max(0.01, skipU));
+      info.gauge = skipU >= 1 ? "skipped" : !skipGauge && (o > order("gauge") || (id === "gauge" && t >= 0.85)) && o <= order("return") ? "read" : "rest";
       // switch arrow + barriers + padlocks
       const arrowU = id === "route" ? easeOutBack(phase(t, 0.62, 0.84)) : o > order("route") ? 1 : 0;
       refs.arrow.rotation.y = lerp(ARROW_ANGLE.neutral, ARROW_ANGLE[target], arrowU);

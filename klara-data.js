@@ -118,6 +118,7 @@
   ];
 
   // Pure routing decision. Invariant: protected data never gets an external target.
+  // Protected data settles the route on its own: complexity is then not assessed at all (complexityChecked = false).
   function decide(prompt, policy) {
     if (!prompt) return null;
     const pol = policy && POLICY_OPTIONS.some(o => o.id === policy.external) ? policy : DEFAULT_SETTINGS;
@@ -129,7 +130,7 @@
     const states = { local: "faded", apiq: "faded", frontier: "faded" };
     if (sensitive.length) {
       states.apiq = "blocked"; states.frontier = "blocked";
-      reason = (fromAttachment && !prompt.sensitive.length ? "dane chronione w załączniku" : "dane chronione") + " – zadanie realizuje model lokalny, trasy zewnętrzne zablokowane";
+      reason = (fromAttachment && !prompt.sensitive.length ? "dane chronione w załączniku" : "dane chronione") + " – zawsze przetwarzanie lokalne, bez oceny złożoności; trasy zewnętrzne zablokowane";
       badge = "dane pozostają w infrastrukturze organizacji";
     } else if (level !== "high") {
       reason = "wystarczająca jakość przy niższym koszcie – model lokalny";
@@ -147,11 +148,11 @@
     }
     states[target] = "on";
     return {
-      target, states, reason, badge, kinds, level, fromAttachment, protectedCount: sensitive.length,
+      target, states, reason, badge, kinds, level, fromAttachment, protectedCount: sensitive.length, complexityChecked: !sensitive.length,
       external: ROUTES[target].external,
       checks: [
         sensitive.length ? "bezpieczeństwo danych: wykryto " + kinds.join(", ") + (fromAttachment ? " (także w załączniku)" : "") : "bezpieczeństwo danych: brak danych chronionych" + (prompt.attachment ? " (sprawdzono też załącznik)" : ""),
-        "stopień złożoności: " + COMPLEXITY[level].label,
+        sensitive.length ? "stopień złożoności: nie jest sprawdzany – dane chronione zawsze przetwarza model lokalny" : "stopień złożoności: " + COMPLEXITY[level].label,
         "decyzja o wyborze modelu: " + ROUTES[target].inline
       ],
       meta: ROUTES[target].external ? "na zewnątrz trafia wyłącznie treść zadania – bez danych chronionych · koszt: " + ROUTES[target].cost
