@@ -45,7 +45,18 @@ window.WorldCore = (() => {
   const LIGHT_LIFT = [0, 0.3, 0.15]; // the carrier's glow light hovers above and in front of the sheet
   // The sun sits at SUN_OFFSET from the point it lights. Its shadow map covers only what the camera shows (plus a margin),
   // in fixed sizes so the shadow texels stay put while the camera settles: close-ups get sharp shadows from the same map.
-  const SUN_OFFSET = [-4, 14, 7], SHADOW = { map: 2048, sizes: [3, 4.5, 6.5, 9, 11], margin: 1.5 };
+  const SUN_OFFSET = [-5, 12.5, 6.5], SHADOW = { map: 2048, sizes: [3, 4.5, 6.5, 9, 11], margin: 1.5 };
+  // How each surface answers light, by colour name: [roughness, metalness]. Bare metal is shiny and mirrors the room, painted
+  // sheet metal is satin, glossy plastic and ceramics have tight highlights, fabric and rubber have broad dull ones.
+  const SURFACE_DEFAULT = [0.7, 0.02], MIRROR_FROM = 0.25, SURFACE = {
+    metal: [0.3, 0.85], lockMetal: [0.28, 0.85], glass: [0.08, 0.3], screen: [0.2, 0], ink: [0.26, 0.05], keyboard: [0.5, 0],
+    paper: [0.48, 0], cream: [0.6, 0], counter: [0.3, 0], pot: [0.32, 0], wood: [0.52, 0], shelf: [0.55, 0], cabinet: [0.42, 0.2],
+    upholstery: [0.96, 0], sofa: [0.96, 0], rug: [1, 0], leaf: [0.58, 0], leafLight: [0.58, 0], cloud: [1, 0],
+    rack: [0.46, 0.18], rackDark: [0.42, 0.2], rackFace: [0.34, 0.12], gpu: [0.36, 0.3], xrayShell: [0.34, 0.15], podium: [0.4, 0],
+    belt: [0.9, 0], cable: [0.86, 0], wall: [0.9, 0], wallServer: [0.86, 0], foundation: [0.8, 0], officeFloor: [0.62, 0], serverFloor: [0.5, 0]
+  };
+  // Soft contact shadows under whatever stands on a floor: the office and server-room floor, and the floor inside the rack.
+  const CONTACT = { opacity: 0.4, minHeight: 0.05, lift: 0.007, rackLift: 0.002, pxPerUnit: 150, maxPx: 192 };
 
   function create(product) {
     const P = product.config;
@@ -76,12 +87,14 @@ window.WorldCore = (() => {
 
     function material(name) {
       if (materials[name]) return materials[name];
-      const isScreen = name === "screen", isMetal = name === "metal" || name === "lockMetal";
-      return (materials[name] = new THREE.MeshStandardMaterial({ color: colors[name] || colors.paper, roughness: isScreen ? 0.3 : isMetal ? 0.42 : 0.72, metalness: isMetal ? 0.55 : 0.03 }));
+      return (materials[name] = own(name));
     }
     // A private material for anything that animates colour, glow or opacity.
     function own(name, extra = {}) {
-      return new THREE.MeshStandardMaterial({ color: colors[name] || colors.paper, roughness: 0.6, metalness: 0.05, ...extra });
+      const [roughness, metalness] = SURFACE[name] || SURFACE_DEFAULT;
+      // bare metal and glass mirror the room at full strength; everything else takes the room as (weaker) fill light
+      const mirror = metalness >= MIRROR_FROM ? { envMap: refs.env, envMapIntensity: 1 } : null;
+      return new THREE.MeshStandardMaterial({ color: colors[name] || colors.paper, roughness, metalness, ...mirror, ...extra });
     }
     function mesh(geometry, mat, parent = world) {
       const m = new THREE.Mesh(geometry, typeof mat === "string" ? material(mat) : mat);
@@ -92,20 +105,50 @@ window.WorldCore = (() => {
       if (!geometries.has(key)) geometries.set(key, make());
       return geometries.get(key);
     }
+    // A box standing on y. `bevel` rounds its corners in plan and chamfers its top and bottom edges, so they catch the light.
     function box(x, z, w, d, h, mat, y = 0, parent = world, bevel = 0) {
       let g;
       if (bevel) {
-        const s = new THREE.Shape(), r = Math.min(bevel, w / 4, d / 4);
-        s.moveTo(-w / 2 + r, -d / 2); s.lineTo(w / 2 - r, -d / 2); s.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r);
-        s.lineTo(w / 2, d / 2 - r); s.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2); s.lineTo(-w / 2 + r, d / 2);
-        s.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r); s.lineTo(-w / 2, -d / 2 + r); s.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2);
-        g = geo("bevel", [w, d, h, r], () => { const e = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 4 }); e.rotateX(-Math.PI / 2); e.translate(0, -h / 2, 0); return e; });
+        const r = Math.min(bevel, w / 4, d / 4), b = Math.min(r * 0.6, h * 0.3), hw = w / 2 - b, hd = d / 2 - b, rr = Math.max(r - b, 0.001);
+        g = geo("bevel", [w, d, h, r], () => {
+          const s = new THREE.Shape();
+          s.moveTo(-hw + rr, -hd); s.lineTo(hw - rr, -hd); s.quadraticCurveTo(hw, -hd, hw, -hd + rr);
+          s.lineTo(hw, hd - rr); s.quadraticCurveTo(hw, hd, hw - rr, hd); s.lineTo(-hw + rr, hd);
+          s.quadraticCurveTo(-hw, hd, -hw, hd - rr); s.lineTo(-hw, -hd + rr); s.quadraticCurveTo(-hw, -hd, -hw + rr, -hd);
+          const e = new THREE.ExtrudeGeometry(s, { depth: h - 2 * b, bevelEnabled: true, bevelSize: b, bevelThickness: b, bevelSegments: 2, curveSegments: 4 });
+          e.rotateX(-Math.PI / 2); e.translate(0, -h / 2 + b, 0); return e;
+        });
       } else g = geo("box", [w, h, d], () => new THREE.BoxGeometry(w, h, d));
-      const m = mesh(g, mat, parent); m.position.set(x, y + h / 2, z); return m;
+      const m = mesh(g, mat, parent); m.position.set(x, y + h / 2, z);
+      grounded(x, z, w, d, h, y, parent); return m;
     }
     function cylinder(x, z, r, h, mat, y = 0, parent = world, rTop = r, seg = 20) {
       const m = mesh(geo("cyl", [rTop, r, h, seg], () => new THREE.CylinderGeometry(rTop, r, h, seg)), mat, parent);
-      m.position.set(x, y + h / 2, z); return m;
+      m.position.set(x, y + h / 2, z); grounded(x, z, r * 2, r * 2, h, y, parent, true); return m;
+    }
+    // A blurred dark patch under a footprint (w × d): it ties the object to the floor it stands on.
+    function contact(x, z, w, d, y, parent = world, round = false, spread = 0.1, opacity = CONTACT.opacity) {
+      const W = w + spread * 2, D = d + spread * 2, ppu = Math.min(CONTACT.pxPerUnit, CONTACT.maxPx / Math.max(W, D));
+      const key = [w, d, spread, round].map(v => (typeof v === "number" ? v.toFixed(2) : v)).join(",");
+      if (!refs.contactTex) refs.contactTex = new Map();
+      if (!refs.contactTex.has(key)) refs.contactTex.set(key, canvasTexture(Math.max(8, Math.round(W * ppu)), Math.max(8, Math.round(D * ppu)), (c, cw, ch) => {
+        // only the blur lands on the canvas: the solid shape is drawn off to the left and its shadow is offset back in
+        const off = cw * 3, sx = spread * ppu, sy = spread * ppu;
+        c.shadowColor = colors.paper; c.shadowBlur = spread * ppu * 0.9; c.shadowOffsetX = off; c.fillStyle = colors.paper;
+        c.beginPath(); if (round) c.ellipse(cw / 2 - off, ch / 2, cw / 2 - sx, ch / 2 - sy, 0, 0, Math.PI * 2); else c.rect(sx - off, sy, cw - sx * 2, ch - sy * 2); c.fill();
+      }));
+      const mat = new THREE.MeshBasicMaterial({ map: refs.contactTex.get(key), color: colors.ink, transparent: true, opacity, depthWrite: false });
+      const m = new THREE.Mesh(geo("plane", [W, D], () => new THREE.PlaneGeometry(W, D)), mat);
+      m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.userData.noCollide = true; parent.add(m); return m;
+    }
+    // box() and cylinder() call this: whatever stands on a floor gets a contact shadow sized to it (taller casts wider).
+    function grounded(x, z, w, d, h, y, parent, round = false) {
+      if (h < CONTACT.minHeight || !(parent === world || parent.userData.onFloor)) return;
+      const { FLOOR, RACK } = G, inRack = Math.abs(x - RACK.cx) < RACK.w / 2 && Math.abs(z - RACK.cz) < RACK.d / 2;
+      const onFloor = y >= 0 && y <= FLOOR + 0.001, onRackFloor = inRack && Math.abs(y - (FLOOR + 0.12)) < 0.001;
+      if (!onFloor && !onRackFloor) return;
+      const top = parent === world ? (onRackFloor ? y + CONTACT.rackLift : FLOOR + CONTACT.lift) : CONTACT.lift;
+      contact(x, z, w, d, top, parent, round, clamp(h * 0.22, 0.04, 0.16));
     }
     function sphere(x, y, z, r, mat, parent = world, sx = 1, sy = 1, sz = 1) {
       const m = mesh(geo("sph", [r], () => new THREE.SphereGeometry(r, 14, 10)), mat, parent);
@@ -118,10 +161,13 @@ window.WorldCore = (() => {
       const m = box((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, len, w, h, mat, y);
       m.rotation.y = -Math.atan2(dz, dx); return m;
     }
-    function canvasTexture(w, h, draw) {
+    // `data` textures hold numbers (roughness, relief), not colours: they skip the sRGB decoding.
+    function canvasTexture(w, h, draw, data = false) {
       const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h);
-      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+      const t = new THREE.CanvasTexture(c); t.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace; t.anisotropy = 4; return t;
     }
+    // A grey level (0..1) for data textures.
+    const grey = v => { const n = Math.round(clamp(v) * 255); return `rgb(${n},${n},${n})`; };
     function hexPath(ctx, cx, cy, r) {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; ctx[i ? "lineTo" : "moveTo"](cx + r * Math.cos(a), cy + r * Math.sin(a)); }
@@ -170,8 +216,22 @@ window.WorldCore = (() => {
     function buildRooms() {
       const { FLOOR, HOLE_TOP, LANE_Z, GATE_X } = G;
       box(7.0, 3.0, 14.5, 6.5, 0.24, "foundation", -0.24, world, 0.06);
-      box(3.75, 3.0, 7.5, 6.0, FLOOR, "officeFloor");
-      box(10.85, 3.0, 6.7, 6.0, FLOOR, "serverFloor");
+      contact(7.0, 3.0, 14.5, 6.5, -0.246, world, false, 0.5, 0.3);
+      // floor finish: the office floor is worn unevenly, the raised server-room floor differs tile by tile (0.6 m grid, darker joints)
+      const rnd = seeded(23), SCALE = 40;
+      const officeRough = canvasTexture(7.5 * SCALE, 6 * SCALE, (c, w, h) => {
+        c.fillStyle = grey(0.66); c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 46; i++) {
+          const x = rnd() * w, y = rnd() * h, r = 26 + rnd() * 60, g = c.createRadialGradient(x, y, 0, x, y, r), v = rnd() > 0.5 ? 255 : 90;
+          g.addColorStop(0, `rgba(${v},${v},${v},0.2)`); g.addColorStop(1, `rgba(${v},${v},${v},0)`); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+        }
+      }, true);
+      const TILE = 0.6 * SCALE, serverRough = canvasTexture(6.7 * SCALE, 6 * SCALE, (c, w, h) => {
+        c.fillStyle = grey(0.9); c.fillRect(0, 0, w, h);
+        for (let x = TILE - 12 - TILE; x < w; x += TILE) for (let y = 0; y < h; y += TILE) { c.fillStyle = grey(0.4 + rnd() * 0.2); c.fillRect(x + 1, y + 1, TILE - 2, TILE - 2); }
+      }, true);
+      box(3.75, 3.0, 7.5, 6.0, FLOOR, own("officeFloor", { roughness: 1, roughnessMap: officeRough }));
+      box(10.85, 3.0, 6.7, 6.0, FLOOR, own("serverFloor", { roughness: 1, roughnessMap: serverRough }));
       for (let x = 8.1; x < 14.2; x += 0.6) box(x, 3.0, 0.012, 6.0, 0.004, "tileLine", FLOOR);
       for (let z = 0.6; z < 6; z += 0.6) box(10.85, z, 6.7, 0.012, 0.004, "tileLine", FLOOR);
       const rug = P.office && "rug" in P.office ? P.office.rug : [2.6, 2.95, 4.6, 2.3];
@@ -205,7 +265,8 @@ window.WorldCore = (() => {
     // A desk with a monitor; the user sits on the +z side (rot turns it around its centre).
     function deskAt(x, z, rot = 0, screenMat) {
       screenMat = screenMat || (refs.deskScreenMat ??= own("screen", { emissive: colors.screen, emissiveIntensity: 0.2 }));
-      const g = group(x, 0, z); g.rotation.y = rot;
+      const g = group(x, 0, z); g.rotation.y = rot; g.userData.onFloor = true;
+      contact(0, 0, 1.3, 0.66, G.FLOOR + CONTACT.lift, g, false, 0.16, 0.16); // the shade under the top
       box(0, 0, 1.3, 0.66, 0.05, "wood", 0.7, g, 0.03);
       for (const dx of [-0.6, 0.6]) for (const dz of [-0.28, 0.28]) box(dx, dz, 0.05, 0.05, 0.7, "metal", 0, g);
       cylinder(0, -0.18, 0.012, 0.12, "metal", 0.75, g);
@@ -221,6 +282,7 @@ window.WorldCore = (() => {
     }
     function chair(x, z, rot = 0) {
       const g = group(x, 0, z); g.rotation.y = rot;
+      contact(0, 0, 0.3, 0.3, G.FLOOR + CONTACT.lift, g, true, 0.08);
       cylinder(0, 0, 0.13, 0.04, "metal", 0.02, g); cylinder(0, 0, 0.03, 0.26, "metal", 0.04, g);
       box(0, 0, 0.32, 0.32, 0.06, "upholstery", 0.3, g, 0.03); box(0, -0.15, 0.32, 0.05, 0.34, "upholstery", 0.36, g, 0.02);
     }
@@ -240,6 +302,7 @@ window.WorldCore = (() => {
     // ─── Build: robots (port of the Explore the Floor concierge) ───
     function buildRobot(accent) {
       const g = group(); const limbs = [];
+      contact(0, 0.01, 0.24, 0.2, CONTACT.lift, g, true, 0.07, 0.5); // the robot's group stands on the floor
       box(0, 0, 0.25, 0.17, 0.25, accent, 0.26, g, 0.04); box(0, 0, 0.29, 0.21, 0.21, "paper", 0.54, g, 0.04);
       box(0, 0.111, 0.22, 0.012, 0.105, "ink", 0.592, g, 0.022);
       for (const s of [-1, 1]) sphere(s * 0.06, 0.647, 0.124, 0.02, "screen", g);
@@ -274,8 +337,28 @@ window.WorldCore = (() => {
       box(x0 - 0.005, cz, 0.012, inlet[1] - inlet[0] + 0.04, 0.03, "metal", HOLE_TOP - 0.03);
       box(x1 - 0.04, cz, 0.08, d, h, "rack", FLOOR);
       // lid + front cover open when the journey goes inside
-      refs.lidMat = own("rackFace", { transparent: true, opacity: 1 });
-      refs.lid = box(cx, cz, w + 0.02, d + 0.02, 0.06, refs.lidMat, FLOOR + h); refs.lidY = refs.lid.position.y;
+      // the lid is three removable covers: seams between them, a fastener in every corner, a vent grille over the GPU servers
+      const LW = w + 0.02, LD = d + 0.02, lidDetail = (c, W, H, tone) => {
+        const u = W / LW, covers = 3, cw = W / covers, inset = 0.045 * u;
+        c.fillStyle = tone.base; c.fillRect(0, 0, W, H);
+        c.strokeStyle = tone.seam; c.lineWidth = 0.014 * u;
+        for (let i = 0; i < covers; i++) c.strokeRect(i * cw + inset / 2, inset / 2, cw - inset, H - inset);
+        for (let i = 0; i < covers; i++) for (const fx of [0.11, 0.89]) for (const fy of [0.13, 0.87]) {
+          const x = (i + fx) * cw, y = fy * H, r = 0.034 * u;
+          c.fillStyle = tone.screw; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+          c.strokeStyle = tone.seam; c.lineWidth = r * 0.4; c.beginPath(); c.moveTo(x - r * 0.6, y - r * 0.6); c.lineTo(x + r * 0.6, y + r * 0.6); c.stroke();
+        }
+        const vx = (CAB.x - (cx - LW / 2)) * u, vw = 0.62 * u, vh = 0.046 * u; c.fillStyle = tone.vent;
+        for (let y = H * 0.27; y < H * 0.74; y += vh * 2.1) pill(c, vx - vw / 2, y, vw, vh);
+      };
+      const lidMap = canvasTexture(1024, Math.round(1024 * LD / LW), (c, W, H) => lidDetail(c, W, H, { base: colors.rackFace, seam: colors.ink, screw: colors.metal, vent: colors.ink }));
+      const lidRelief = canvasTexture(1024, Math.round(1024 * LD / LW), (c, W, H) => lidDetail(c, W, H, { base: grey(0.6), seam: grey(0.15), screw: grey(0.95), vent: grey(0) }), true);
+      // the caps of a bevelled box are mapped in metres from its centre: fit the texture to the lid
+      for (const t of [lidMap, lidRelief]) { t.repeat.set(1 / LW, 1 / LD); t.offset.set(0.5, 0.5); }
+      refs.lidMats = [own("rackFace", { color: colors.paper, transparent: true, opacity: 1, map: lidMap, bumpMap: lidRelief, bumpScale: 2.5 }), own("rackFace", { transparent: true, opacity: 1 })];
+      refs.lid = box(cx, cz, LW, LD, 0.06, refs.lidMats, FLOOR + h, world, 0.03); refs.lidY = refs.lid.position.y;
+      for (let y = 0.34; y < 0.86; y += 0.065) box(x1 + 0.004, CAB.z, 0.012, 0.86, 0.022, "rackDark", y).castShadow = false;
+      for (const dz of [-0.47, 0.47]) box(x1 + 0.003, CAB.z + dz, 0.01, 0.03, 0.6, "metal", 0.3).castShadow = false;
       const face = canvasTexture(1024, 256, (c, W, H) => {
         c.fillStyle = colors.rackFace; c.fillRect(0, 0, W, H);
         c.strokeStyle = colors.rackLine; c.lineWidth = 7;
@@ -436,6 +519,12 @@ window.WorldCore = (() => {
       paths.sendSegments = send; paths.send = makePath(send);
       const cable = makePath([{ line: cablePts }]);
       mesh(new THREE.TubeGeometry(cable, 260, 0.024, 6, false), "cable").userData.noCollide = true;
+      // saddle clips hold the cable to the floor; a plug at the monitor and a socket at the head of the server's belt
+      const clip = (x, z, alongX) => { box(x, z, alongX ? 0.035 : 0.11, alongX ? 0.11 : 0.035, 0.078, "metal", FLOOR).userData.noCollide = true; };
+      for (let x = 3.3; x < 7.4; x += 0.82) clip(x, LANE_Z, true);
+      clip(2.6, 1.08, false); for (const z of [1.25, 2.1]) clip(7.95, z, false);
+      box(2.6, 2.0, 0.06, 0.05, 0.06, "ink", 0.89).userData.noCollide = true;
+      box(8.45, 2.8, 0.07, 0.12, 0.09, "metal", 0.255, world, 0.015).userData.noCollide = true;
       refs.glowMat = own("accent", { emissive: colors.accent, emissiveIntensity: 1.1, transparent: true, opacity: 0.85 });
       refs.glow = new THREE.Mesh(new THREE.TubeGeometry(cable, 260, 0.032, 6, false), refs.glowMat); refs.glow.userData.noCollide = true; world.add(refs.glow);
       refs.glowCount = refs.glow.geometry.index.count; refs.sendLen = paths.send.getLength(); refs.hopLen = makePath([{ line: hop }]).getLength();
@@ -555,7 +644,7 @@ window.WorldCore = (() => {
       refs.adminMat.emissiveIntensity = id === "admin" || id === "final" ? 0.9 : 0.3;
       // rack opens in the first scene inside the server
       const oo = order(P.openScene), open = o < oo ? 0 : o === oo ? ease(phase(t, 0, 0.3)) : 1;
-      refs.lid.position.y = refs.lidY + open * 1.6; refs.lidMat.opacity = 1 - open; refs.lid.visible = open < 0.99;
+      refs.lid.position.y = refs.lidY + open * 1.6; refs.lidMats.forEach(m => { m.opacity = 1 - open; }); refs.lid.visible = open < 0.99;
       refs.front.position.z = refs.frontZ + open * 0.7; refs.frontMats.forEach(m => { m.opacity = 1 - open; m.depthWrite = open < 0.5; }); refs.front.visible = open < 0.99;
       refs.lid.castShadow = refs.front.castShadow = open < 0.5;
       // cable glow
@@ -786,15 +875,15 @@ window.WorldCore = (() => {
         renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
         renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.06;
         renderer.domElement.className = "world-canvas"; renderer.domElement.setAttribute("role", "img");
         renderer.domElement.setAttribute("aria-label", P.ariaLabel || "Świat 3D. Przeciągnij, aby obrócić; kółko przybliża; dwuklik resetuje widok.");
         stage.prepend(renderer.domElement);
         scene = new THREE.Scene(); scene.background = new THREE.Color(colors.background);
         camera = new THREE.OrthographicCamera(-5, 5, 4, -4, 0.1, 90);
         buildEnvironment();
-        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 1.5));
-        sun = new THREE.DirectionalLight(colors.light, 3.0);
+        scene.add(new THREE.HemisphereLight(colors.sky, colors.bounce, 0.62));
+        sun = new THREE.DirectionalLight(colors.light, 3.5);
         sun.castShadow = true; sun.shadow.mapSize.set(SHADOW.map, SHADOW.map);
         sun.shadow.camera.far = 40; sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0002;
         scene.add(sun, sun.target);
@@ -805,7 +894,7 @@ window.WorldCore = (() => {
           THREE, G, colors, refs, paths, info, world,
           clamp, phase, ease, easeOutBack, lerp, v3, order, font, own, box, cylinder, sphere, group, strip, canvasTexture,
           makePath, seeded, fakeText, paintMark, plates, rackScreen, rackBoard, padlock, localRoute, legs, returnPath,
-          ride, swallowScale, poseCabinet, deskAt, chair, plant
+          ride, swallowScale, poseCabinet, deskAt, chair, plant, contact
         });
         buildRooms(); buildOffice(); buildRackShell(); buildClouds(); buildSendPath();
         S.build(); S.buildPaths();
@@ -831,7 +920,7 @@ window.WorldCore = (() => {
       studio.add(new THREE.Mesh(new THREE.BoxGeometry(20, 12, 20), [wall, wall, lit("light", 1.6), lit("bounce", 0.7), wall, wall]));
       const panel = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 7), new THREE.MeshBasicMaterial({ color: new THREE.Color(colors.light).multiplyScalar(5) }));
       panel.position.set(-2, 5, 3); studio.add(panel);
-      scene.environment = pmrem.fromScene(studio, 0.04).texture; scene.environmentIntensity = 0.3;
+      refs.env = scene.environment = pmrem.fromScene(studio, 0.04).texture; scene.environmentIntensity = 0.34;
       pmrem.dispose(); studio.traverse(o => { if (o.isMesh) { o.geometry.dispose(); [].concat(o.material).forEach(m => m.dispose()); } });
     }
     function fail(message) {
